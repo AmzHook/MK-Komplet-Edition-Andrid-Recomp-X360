@@ -58,7 +58,7 @@ for item in source.rglob('*'):
     'ReXGlue Android runtime source: https://github.com/PauloUbirajara/asura-wrath-rexglue-sdk\n'
     'Pinned commit: 38b40e7424e5d3ce1afa38dca10e9a84b1aa2317\n'
     'Submodule sources and commit pins: .gitmodules and gitlinks in that SDK.\n'
-    'Local SDK changes: native/patches/android-fiber.patch and indirect-call-diagnostics.patch.\n'
+    'Local SDK changes: native/patches/android-fiber.patch, indirect-call-diagnostics.patch, floating-point-stub-logging.patch.\n'
     'Original Android wrapper and build scripts: AmzHook/MK-Komplet-Edition-Andrid-Recomp-X360.\n'
     'No XEX, ISO or game assets are distributed; the APK includes title-specific compiled code.\n'
     'Exact corresponding public runtime/dependency sources: native/prebuilt/runtime-sources.tar.xz.\n'

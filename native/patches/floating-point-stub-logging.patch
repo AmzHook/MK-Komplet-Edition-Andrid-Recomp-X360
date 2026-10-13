@@ -1,0 +1,59 @@
+Rate-limit only diagnostics for the two unimplemented floating-point exports.
+Base: asura-wrath-rexglue-sdk 38b40e7424e5d3ce1afa38dca10e9a84b1aa2317.
+Emit WARN on call 1 and every 4096 calls per API, with a cumulative counter,
+LR, existing R3 and guest thread ID. Atomic counters make the cadence safe
+across threads. Raw PPC signatures, export registration and stub behavior are
+preserved: no guest memory reads, register/FP-state writes or invented status.
+BSD-3-Clause SDK source notices remain unchanged.
+
+diff --git a/src/kernel/xboxkrnl/xboxkrnl_threading.cpp b/src/kernel/xboxkrnl/xboxkrnl_threading.cpp
+--- a/src/kernel/xboxkrnl/xboxkrnl_threading.cpp
++++ b/src/kernel/xboxkrnl/xboxkrnl_threading.cpp
+@@ -1431,6 +1431,32 @@
+ }
+ 
+ }  // namespace rex::kernel::xboxkrnl
++
++namespace {
++
++// Diagnostic cadence only; floating-point state remains unimplemented.
++bool ShouldLogFloatingPointStub(std::atomic<uint64_t>& calls, uint64_t& invocation) {
++  invocation = calls.fetch_add(1, std::memory_order_relaxed) + 1;
++  return invocation == 1 || invocation % 4096 == 0;
++}
++
++}  // namespace
++
++// Keep the same raw PPC signature and ordinal registration as REX_EXPORT_STUB.
++// No guest register or memory is changed, including the existing R3 value.
++#define REX_EXPORT_FLOATING_POINT_STUB(name)                                  \
++  extern "C" REX_FUNC(name) {                                                 \
++    (void)base;                                                               \
++    static std::atomic<uint64_t> calls{0};                                     \
++    uint64_t invocation;                                                      \
++    if (ShouldLogFloatingPointStub(calls, invocation)) {                        \
++      REXKRNL_WARN("{} UNIMPLEMENTED calls={} LR=0x{:08X} R3=0x{:08X} "         \
++                   "guestThreadID=0x{:08X}",                                 \
++                   #name, invocation, static_cast<uint32_t>(ctx.lr),           \
++                   ctx.r3.u32, rex::runtime::ThreadState::GetThreadID());        \
++    }                                                                         \
++  }                                                                           \
++  static rex::ppc::detail::PPCFuncRegistrar _ppc_reg_##name(#name, &name);
+ 
+ REX_EXPORT(__imp__ExCreateThread, rex::kernel::xboxkrnl::ExCreateThread_entry)
+ REX_EXPORT(__imp__ExTerminateThread, rex::kernel::xboxkrnl::ExTerminateThread_entry)
+@@ -1536,11 +1562,12 @@
+ REX_EXPORT_STUB(__imp__KeQueryBackgroundProcessors);
+ REX_EXPORT_STUB(__imp__KeQueryInterruptTime);
+ REX_EXPORT_STUB(__imp__KeRegisterDriverNotification);
+-REX_EXPORT_STUB(__imp__KeRestoreFloatingPointState);
++REX_EXPORT_FLOATING_POINT_STUB(__imp__KeRestoreFloatingPointState);
+ REX_EXPORT_STUB(__imp__KeRestoreVectorUnitState);
+ REX_EXPORT_STUB(__imp__KeRetireDpcList);
+ REX_EXPORT_STUB(__imp__KeRundownQueue);
+-REX_EXPORT_STUB(__imp__KeSaveFloatingPointState);
++REX_EXPORT_FLOATING_POINT_STUB(__imp__KeSaveFloatingPointState);
++#undef REX_EXPORT_FLOATING_POINT_STUB
+ REX_EXPORT_STUB(__imp__KeSaveVectorUnitState);
+ REX_EXPORT_STUB(__imp__KeSetBackgroundProcessors);
+ REX_EXPORT_STUB(__imp__KeSetPriorityClassThread);

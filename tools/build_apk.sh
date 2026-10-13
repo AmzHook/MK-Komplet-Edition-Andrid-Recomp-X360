@@ -25,9 +25,9 @@ if [ "$variant" = --native ]; then
     build_dir=out/experimental
     manifest=android/AndroidManifest-native.xml
     min_api=28
-    apk_name=MK-Experimental-0.1.1.apk
-    version_code=2
-    version_name=0.1.1
+    apk_name=MK-Experimental-0.1.2.apk
+    version_code=3
+    version_name=0.1.2
     sdk_root="${MK_NATIVE_TOOLS:-/workspace/.tools/mk-native}/rexglue-sdk"
     sdl_java_root="${MK_SDL_JAVA_ROOT:-$repo_root/vendor/sdl3/android/org/libsdl/app}"
     if [ ! -d "$sdl_java_root" ]; then

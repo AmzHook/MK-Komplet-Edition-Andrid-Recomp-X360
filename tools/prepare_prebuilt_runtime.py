@@ -65,12 +65,14 @@ def verify(source):
             raise ValueError('Unpackaged native dependency in ' + name + ': ' + ', '.join(sorted(needed - LIBRARIES - SYSTEM_LIBRARIES)))
         if name == 'libmk_komplete.so' and not re.search(r'\bSDL_main\b', details):
             raise ValueError('Native game library does not export SDL_main.')
-        if name == 'libmk_komplete.so' and not re.search(r'\bsub_829AEB48\b', details):
-            raise ValueError('Native game library lacks the 0.1.1 virtual-call correction.')
+        if name == 'libmk_komplete.so' and not all(re.search(r'\b' + symbol + r'\b', details) for symbol in ['sub_829AEB48', 'sub_827EF090']):
+            raise ValueError('Native game library lacks the observed 0.1.2 virtual-call corrections.')
         if name == 'librexruntime.so' and not all(symbol in details for symbol in ['JNI_OnLoad', 'Java_org_libsdl_app_SDLActivity_nativeRunMain']):
             raise ValueError('Runtime lacks SDL Java/JNI entry points.')
         if name == 'librexruntime.so' and b'guestThreadID=0x{:08X}' not in path.read_bytes():
             raise ValueError('Runtime lacks the 0.1.1 indirect-call diagnostics.')
+        if name == 'librexruntime.so' and b'UNIMPLEMENTED calls=' not in path.read_bytes():
+            raise ValueError('Runtime lacks the 0.1.2 bounded floating-point stub diagnostics.')
         print(f'Verified {name}: ARM64, 16 KiB LOAD alignment, packaged dependencies')
 
 

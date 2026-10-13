@@ -58,9 +58,9 @@ nenhuma removida. A geração final levou aproximadamente 489,7 segundos. As
 fontes derivadas permanecem em `out/native/mk-komplete/generated/default`, fora
 do Git. Esse resultado demonstra geração estática concluída, não execução.
 
-O arquivo versionado `native/mk9_functions.toml` contém **12 intervalos
-de funções**, vinculados ao SHA-256 acima; o décimo segundo foi acrescentado
-após o teste no Poco F7 descrito abaixo. Os limites foram recuperados por
+O arquivo versionado `native/mk9_functions.toml` contém **13 intervalos
+de funções**, vinculados ao SHA-256 acima; os dois últimos foram acrescentados
+após os testes no Poco F7 descritos abaixo. Os limites foram recuperados por
 análise estática de fluxo de controle e lacunas da tabela de funções. Dois
 intervalos de troca de contexto conservam os registradores do convidado com
 `share_registers = true`. Não foram adicionadas instruções do jogo, funções
@@ -130,8 +130,42 @@ manuais. A compilação incremental concluiu a ligação da biblioteca MK para
 ARM64, preservando a otimização das funções do jogo.
 
 O teste comprova progresso da inicialização do runtime no aparelho, mas não o
-carregamento completo do MK. A execução após esta correção permanece pendente
-de um novo teste.
+carregamento completo do MK. O segundo teste abaixo verificou que essa chamada
+foi superada, antes de encontrar outro método ausente.
+
+## Segundo teste no Poco F7 e correção 0.1.2
+
+O usuário relatou a exibição da logo na versão 0.1.1. O log passou pela criação
+de pipelines gráficos e não repetiu a chamada ausente `0x829AEB48`. A nova falha
+foi `0x827EF090`, com LR `0x827C7BD0`, CTR `0x827EF090` e thread convidada 6.
+
+A chamada em `0x827C7BCC` usa o slot `+0x18` da tabela de métodos em
+`0x82147300`. O slot em `0x82147318` aponta para `0x827EF090`, uma função real
+de 16 bytes terminando em `0x827EF0A0`. Ela lê dois campos e retorna um flag.
+Os outros 34 métodos dessa tabela já estavam registrados. Metadados de exceções
+adjacentes não foram tratados como funções virtuais nem adicionados por palpite.
+
+A geração 0.1.2 validou e emitiu o método em 539,8 segundos, alterando 5 saídas e
+reaproveitando 534. Foram conferidos seu corpo, declaração, mapeamento e registro
+e o registro dos 13 intervalos manuais. A compilação incremental ARM64 concluiu.
+
+O usuário confirmou a importação de todas as pastas da ISO. A versão 0.1.2
+acrescenta uma auditoria somente de leitura da pasta montada e da presença de
+`Config/Xe-MK9Engine.ini` pelas rotas `game:` e `D:`, respeitando o VFS real e sua
+busca sem distinção de maiúsculas/minúsculas. Não cria configurações nem altera
+os dados do jogo. Os avisos sobre `UPDATE:` ou `ShaderDumpxe:` não são a falha
+fatal identificada.
+
+Os exports KeSaveFloatingPointState e KeRestoreFloatingPointState continuam
+explicitamente não implementados. O patch `floating-point-stub-logging.patch`
+preserva o contexto e os registros e limita os avisos à primeira chamada e a
+cada 4096 chamadas por API, com contador, LR, R3 e ID da thread. O helper real
+foi verificado em testes de limites, isolamento de contadores e concorrência.
+Não foi presumido um formato Windows KFLOATING_SAVE nem inventado um retorno
+de sucesso. A limitação de avisos não implementa a preservação de estado FP.
+
+A execução após a segunda correção e o carregamento completo permanecem
+dependentes do próximo teste no aparelho.
 
 ## Reproduzir as etapas locais
 
