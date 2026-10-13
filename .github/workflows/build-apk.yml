@@ -11,8 +11,9 @@ permissions:
 
 jobs:
   build:
-    # Do not publish an importer-only APK under the user's playability condition.
-    if: vars.MK_DEVICE_PLAYABILITY_VERIFIED == 'true'
+    # The experimental runtime is the default artifact for device tests.
+    # Publish the separate importer-only variant only when explicitly enabled.
+    if: vars.MK_PUBLISH_IMPORTER_ONLY == 'true'
     name: Compile and test Android importer
     runs-on: ubuntu-24.04
     timeout-minutes: 20
