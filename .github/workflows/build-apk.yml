@@ -15,7 +15,7 @@ jobs:
     runs-on: ubuntu-24.04
     timeout-minutes: 20
     env:
-      MK_ANDROID_TOOLS: ${{ runner.temp }}/mk-android
+      MK_ANDROID_TOOLS: /tmp/mk-android
     steps:
       - name: Check out source
         uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
