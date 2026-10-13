@@ -28,3 +28,7 @@
 # vtables. Their tail-call targets are already registered; both entries are real.
 0x832BB358 = { end = 0x832BB360 }
 0x832BB360 = { end = 0x832BB368 }
+# PhysX allocator callbacks installed by 0x82FE9438 via 0x83123590.
+# The free callback explicitly accepts null; its wrapper preserves LR=0x83164BBC.
+0x82FE6298 = { end = 0x82FE62C8 }
+0x82FE62C8 = { end = 0x82FE62EC }

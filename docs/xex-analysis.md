@@ -9,7 +9,7 @@ estática e a geração de C++ para esse arquivo. A biblioteca nativa de MK foi
 compilada para Android ARM64 e integrada a um APK experimental. Os testes no
 Poco F7 avançaram até a logo e identificaram as chamadas ausentes descritas
 abaixo. Não há confirmação de carregamento completo ou APK jogável; a versão
-0.1.3 ainda não foi executada no aparelho.
+0.1.4 ainda não foi executada no aparelho.
 
 ## Identificação do arquivo correto
 
@@ -64,7 +64,8 @@ Na geração 0.1.2, o arquivo versionado `native/mk9_functions.toml` continha
 **13 intervalos de funções**, vinculados ao SHA-256 acima; os dois últimos
 foram acrescentados após os testes no Poco F7 descritos abaixo. A correção
 0.1.3 acrescenta o intervalo observado em execução e dois outros comprovados
-na auditoria das tabelas relacionadas, totalizando 16. Os limites foram
+na auditoria das tabelas relacionadas, totalizando 16. A correção 0.1.4 adiciona
+dois callbacks de memória comprovados, totalizando 18. Os limites foram
 recuperados por análise estática de fluxo de controle e lacunas da tabela de
 funções. Dois
 intervalos de troca de contexto conservam os registradores do convidado com
@@ -201,8 +202,51 @@ A verificação das bibliotecas pré-compiladas passa a exigir `sub_832BB358`,
 preserva as exigências dos markers de diagnóstico do SDK. A validação estática
 e a inspeção desses símbolos não demonstram execução bem-sucedida.
 
-O teste da versão 0.1.3 no Poco F7 permanece pendente. Não há confirmação de
-carregamento completo, partidas, áudio ou desempenho após esta correção.
+O log da versão 0.1.3 superou essas chamadas e encontrou o callback ausente
+descrito a seguir. Carregamento completo, partidas, áudio e desempenho ainda
+não foram confirmados.
+
+## Quarto teste no Poco F7 e correção 0.1.4
+
+O usuário relatou que a versão 0.1.3 exibiu a logo do Mortal Kombat e fechou
+antes do vídeo da NetherRealm. O log registrou uma chamada não registrada a `0x82FE62C8`, com
+LR `0x83164BBC`, `R3=0` e `R4=0x82279918`. O argumento R4 identifica a string
+de diagnóstico `PxcArray.h`, do PhysX 2.8.4. A rotina `0x83164B50` expande um
+array e libera seu buffer antigo pela chamada a `0x831235F8` em `0x83164BB8`.
+Esse wrapper lê o callback global em `0x834C0E84` e transfere a execução sem
+alterar o LR.
+
+O callback real em `0x82FE62C8` testa o ponteiro e retorna imediatamente quando
+ele é nulo, antes de ler o alocador global em `0x8344D120`. Portanto, `R3=0`
+é permitido nessa chamada. A falha de registro impediu executar essa lógica.
+Para um ponteiro não nulo, o callback delega ao slot `+0x14` do alocador.
+
+A rotina `0x82FE9438` instala um descritor de cinco callbacks, com quatro
+endereços distintos: `0x82FE6278`, `0x82FE62C8`, `0x82FE62F0`, `0x82FE6298` e
+novamente `0x82FE62C8`. O descritor é passado a `0x83123590` em `0x82FE95C0`.
+Essa instalação comprova também o callback de alocação com diagnóstico em
+`0x82FE6298`, que estava omitido; os outros dois endereços já estavam registrados.
+
+| Entrada | Fim exclusivo | Tamanho | Comportamento |
+| --- | --- | --- | --- |
+| `0x82FE6298` | `0x82FE62C8` | 48 bytes | Delega a alocação ao slot `+0` do alocador |
+| `0x82FE62C8` | `0x82FE62EC` | 36 bytes | Aceita ponteiro nulo; delega a liberação ao slot `+0x14` |
+
+Os dois fluxos são fechados. O `blr` isolado em `0x82FE62EC` não integra esses
+fluxos nem o descritor comprovado e não recebeu uma função inventada. Os novos
+intervalos são vinculados ao SHA-256 exato, com validação completa do ReXGlue.
+A verificação dos pré-compilados exige os dois novos símbolos, além das cinco
+correções anteriores e dos diagnósticos do SDK.
+
+A geração 0.1.4 concluiu as fases de validação e escrita em aproximadamente
+609,1 segundos: 6 arquivos escritos, 533 reaproveitados e nenhum removido. Os
+18 intervalos manuais estão gerados e registrados. A inspeção do callback de
+liberação confirmou o retorno para ponteiro nulo antes de qualquer leitura de
+memória do alocador.
+
+A versão 0.1.4 permanece experimental e precisa de um novo teste no Poco F7.
+Os avisos sobre arquivos e APIs não implementadas continuam sendo limitações
+distintas; o log não comprova que causaram esta chamada não registrada.
 
 ## Reproduzir as etapas locais
 

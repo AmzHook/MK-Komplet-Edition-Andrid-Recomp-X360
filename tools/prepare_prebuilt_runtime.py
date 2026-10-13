@@ -65,8 +65,8 @@ def verify(source):
             raise ValueError('Unpackaged native dependency in ' + name + ': ' + ', '.join(sorted(needed - LIBRARIES - SYSTEM_LIBRARIES)))
         if name == 'libmk_komplete.so' and not re.search(r'\bSDL_main\b', details):
             raise ValueError('Native game library does not export SDL_main.')
-        if name == 'libmk_komplete.so' and not all(re.search(r'\b' + symbol + r'\b', details) for symbol in ['sub_829AEB48', 'sub_827EF090', 'sub_832BB358', 'sub_832BB360', 'sub_832BB848']):
-            raise ValueError('Native game library lacks the observed 0.1.3 virtual-call corrections.')
+        if name == 'libmk_komplete.so' and not all(re.search(r'\b' + symbol + r'\b', details) for symbol in ['sub_829AEB48', 'sub_827EF090', 'sub_832BB358', 'sub_832BB360', 'sub_832BB848', 'sub_82FE6298', 'sub_82FE62C8']):
+            raise ValueError('Native game library lacks the observed 0.1.4 startup-call corrections.')
         if name == 'librexruntime.so' and not all(symbol in details for symbol in ['JNI_OnLoad', 'Java_org_libsdl_app_SDLActivity_nativeRunMain']):
             raise ValueError('Runtime lacks SDL Java/JNI entry points.')
         if name == 'librexruntime.so' and b'guestThreadID=0x{:08X}' not in path.read_bytes():

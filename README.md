@@ -2,8 +2,9 @@
 
 Integração experimental de Mortal Kombat Komplete Edition para Xbox 360 com
 ReXGlue em Android ARM64. O aplicativo importa os arquivos do jogo por ZIP e
-oferece um botão para testar a inicialização do runtime nativo. O teste da versão
-0.1.1 no Poco F7 chegou à logo do jogo. **Carregamento completo, partidas, áudio
+oferece um botão para testar a inicialização do runtime nativo. No teste da
+versão 0.1.3, o usuário relatou a logo do Mortal Kombat antes do vídeo da
+NetherRealm, seguida pelo fechamento. **Carregamento completo, partidas, áudio
 e desempenho ainda não foram verificados.**
 
 O APK experimental contém código nativo gerado para um executável específico.
@@ -11,7 +12,20 @@ O usuário fornece o XEX e as demais pastas do jogo; o aplicativo não baixa ess
 arquivos. O APK `MK-Importador` continua disponível como variante que apenas
 importa arquivos, sem execução.
 
-## Atualização experimental 0.1.3
+## Atualização experimental 0.1.4
+
+Corrige dois callbacks de memória do PhysX omitidos na recompilação:
+`0x82FE62C8`, observado no log da versão 0.1.3, e `0x82FE6298`, encontrado
+no mesmo descritor de callbacks instalado pelo jogo.
+
+O callback de liberação já prevê retorno imediato quando recebe um ponteiro
+nulo. O `R3=0` desse log é um argumento válido; a falha ocorreu antes de executar
+essa verificação, porque a função não estava registrada. A correção gera os
+corpos originais e os registros dos dois callbacks, preservando essa lógica.
+**A versão 0.1.4 ainda precisa de teste no Poco F7; carregamento completo e
+jogabilidade permanecem não verificados.**
+
+## Atualização anterior 0.1.3
 
 Corrige a entrada virtual omitida `0x832BB848`, encontrada no teste da versão
 0.1.2. É uma função real de 8 bytes, terminando em `0x832BB850`, que ajusta o
@@ -23,8 +37,8 @@ entradas reais omitidas, `0x832BB358` e `0x832BB360`, incluídas nesta correçã
 A correção acrescenta os três intervalos originais e seus registros no
 runtime. Mantém as correções de `0x829AEB48` e `0x827EF090`, os diagnósticos de
 chamadas indiretas e os avisos limitados de estado de ponto flutuante.
-**A versão 0.1.3 ainda não foi executada no Poco F7; carregamento completo e
-jogabilidade permanecem não verificados.**
+O log dessa versão superou a chamada anteriormente ausente e parou no callback
+`0x82FE62C8`, tratado pela correção 0.1.4 acima.
 
 ## Atualização anterior 0.1.2
 
@@ -43,7 +57,7 @@ O teste dessa versão superou a falha anterior e encontrou a entrada ausente
 
 ## Instalação e teste
 
-1. Instale `MK-Experimental-0.1.3.apk` em Android 9 ou mais recente, ARM64 e Vulkan.
+1. Instale `MK-Experimental-0.1.4.apk` em Android 9 ou mais recente, ARM64 e Vulkan.
 2. Toque em **Importar ZIP**. Selecione um ZIP contendo exatamente um
    `default.xex` e todas as demais pastas da sua cópia extraída do jogo. Uma pasta
    externa envolvendo esses arquivos é aceita. Uma ISO precisa ser extraída
@@ -75,7 +89,7 @@ pasta temporária e falhas ou cancelamento preservam a cópia anterior.
 Abra [Actions](https://github.com/AmzHook/MK-Komplet-Edition-Andrid-Recomp-X360/actions).
 O workflow **Package MK Experimental APK** compila o aplicativo Java, verifica
 as bibliotecas ARM64 previamente compiladas e empacota o APK experimental.
-Baixe o artefato `MK-Experimental-0.1.3` de uma execução concluída com sucesso.
+Baixe o artefato `MK-Experimental-0.1.4` de uma execução concluída com sucesso.
 O workflow **Build MK Importador APK** produz a variante de importação.
 O workflow experimental está habilitado para testes no aparelho. A publicação
 da variante de importação é opcional e exige a variável de repositório
@@ -87,7 +101,7 @@ artefatos incluem APK e checksum, ficam disponíveis por 30 dias e seu download
 pode exigir login no GitHub. Após extrair, confira:
 
 ```bash
-sha256sum -c MK-Experimental-0.1.3.apk.sha256
+sha256sum -c MK-Experimental-0.1.4.apk.sha256
 ```
 
 A assinatura é de desenvolvimento. Cada runner gera uma chave nova; uma build
@@ -109,7 +123,7 @@ python3 tools/prepare_prebuilt_runtime.py
 bash tools/build_apk.sh --native
 ```
 
-Saída: `out/apk/MK-Experimental-0.1.3.apk`. Para compilar apenas o importador,
+Saída: `out/apk/MK-Experimental-0.1.4.apk`. Para compilar apenas o importador,
 execute `bash tools/build_apk.sh`.
 
 ## Recompilação nativa a partir da sua cópia
