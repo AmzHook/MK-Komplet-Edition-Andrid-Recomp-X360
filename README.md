@@ -11,7 +11,22 @@ O usuário fornece o XEX e as demais pastas do jogo; o aplicativo não baixa ess
 arquivos. O APK `MK-Importador` continua disponível como variante que apenas
 importa arquivos, sem execução.
 
-## Atualização experimental 0.1.2
+## Atualização experimental 0.1.3
+
+Corrige a entrada virtual omitida `0x832BB848`, encontrada no teste da versão
+0.1.2. É uma função real de 8 bytes, terminando em `0x832BB850`, que ajusta o
+receptor em 36 bytes e transfere a execução para `0x832BE380`. A chamada usa o
+slot `+0x08` da tabela de métodos, com LR `0x832E0198`. A auditoria dos 25 slots
+das três tabelas referenciadas pelo método `0x832BB850` identificou outras duas
+entradas reais omitidas, `0x832BB358` e `0x832BB360`, incluídas nesta correção.
+
+A correção acrescenta os três intervalos originais e seus registros no
+runtime. Mantém as correções de `0x829AEB48` e `0x827EF090`, os diagnósticos de
+chamadas indiretas e os avisos limitados de estado de ponto flutuante.
+**A versão 0.1.3 ainda não foi executada no Poco F7; carregamento completo e
+jogabilidade permanecem não verificados.**
+
+## Atualização anterior 0.1.2
 
 Corrige o método virtual omitido `0x827EF090`, chamado em `0x827C7BCC`, que
 interrompeu o segundo teste depois da logo. A versão anterior já corrigiu
@@ -23,11 +38,12 @@ pelas rotas `game:` e `D:`. Os dois avisos de estado de ponto flutuante continua
 explicitamente `UNIMPLEMENTED`, mas aparecem na primeira chamada e a cada 4096,
 preservando o comportamento e evitando dezenas de avisos por segundo.
 
-A execução após esta nova correção ainda precisa de teste no aparelho.
+O teste dessa versão superou a falha anterior e encontrou a entrada ausente
+`0x832BB848`, tratada pela correção 0.1.3 descrita acima.
 
 ## Instalação e teste
 
-1. Instale `MK-Experimental-0.1.2.apk` em Android 9 ou mais recente, ARM64 e Vulkan.
+1. Instale `MK-Experimental-0.1.3.apk` em Android 9 ou mais recente, ARM64 e Vulkan.
 2. Toque em **Importar ZIP**. Selecione um ZIP contendo exatamente um
    `default.xex` e todas as demais pastas da sua cópia extraída do jogo. Uma pasta
    externa envolvendo esses arquivos é aceita. Uma ISO precisa ser extraída
@@ -59,7 +75,7 @@ pasta temporária e falhas ou cancelamento preservam a cópia anterior.
 Abra [Actions](https://github.com/AmzHook/MK-Komplet-Edition-Andrid-Recomp-X360/actions).
 O workflow **Package MK Experimental APK** compila o aplicativo Java, verifica
 as bibliotecas ARM64 previamente compiladas e empacota o APK experimental.
-Baixe o artefato `MK-Experimental-0.1.2` de uma execução concluída com sucesso.
+Baixe o artefato `MK-Experimental-0.1.3` de uma execução concluída com sucesso.
 O workflow **Build MK Importador APK** produz a variante de importação.
 O workflow experimental está habilitado para testes no aparelho. A publicação
 da variante de importação é opcional e exige a variável de repositório
@@ -71,7 +87,7 @@ artefatos incluem APK e checksum, ficam disponíveis por 30 dias e seu download
 pode exigir login no GitHub. Após extrair, confira:
 
 ```bash
-sha256sum -c MK-Experimental-0.1.2.apk.sha256
+sha256sum -c MK-Experimental-0.1.3.apk.sha256
 ```
 
 A assinatura é de desenvolvimento. Cada runner gera uma chave nova; uma build
@@ -93,7 +109,7 @@ python3 tools/prepare_prebuilt_runtime.py
 bash tools/build_apk.sh --native
 ```
 
-Saída: `out/apk/MK-Experimental-0.1.2.apk`. Para compilar apenas o importador,
+Saída: `out/apk/MK-Experimental-0.1.3.apk`. Para compilar apenas o importador,
 execute `bash tools/build_apk.sh`.
 
 ## Recompilação nativa a partir da sua cópia

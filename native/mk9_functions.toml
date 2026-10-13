@@ -21,3 +21,10 @@
 # Virtual getter observed after the logo on Poco F7. Vtable 0x82147300,
 # slot +0x18; return address 0x827C7BD0 identifies the real indirect call.
 0x827EF090 = { end = 0x827EF0A0 }
+# Virtual-method adjustment thunk reached after audio initialization on Poco F7.
+# The call at 0x832E0194 uses slot +0x08; this distinct leaf tail-calls 0x832BE380.
+0x832BB848 = { end = 0x832BB850 }
+# Two additional adjustment thunks in the same class's method-installed
+# vtables. Their tail-call targets are already registered; both entries are real.
+0x832BB358 = { end = 0x832BB360 }
+0x832BB360 = { end = 0x832BB368 }

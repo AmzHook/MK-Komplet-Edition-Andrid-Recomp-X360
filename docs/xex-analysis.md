@@ -6,8 +6,10 @@ por [Xenia #1548](https://github.com/xenia-project/game-compatibility/issues/154
 e [Xenia Canary #424](https://github.com/xenia-canary/game-compatibility/issues/424).
 O nome original do executável é `MK9Game-Retail.exe`. O SDK concluiu a análise
 estática e a geração de C++ para esse arquivo. A biblioteca nativa de MK foi
-compilada para Android ARM64 e integrada a um APK experimental. Não há validação
-de execução no aparelho nem confirmação de APK jogável.
+compilada para Android ARM64 e integrada a um APK experimental. Os testes no
+Poco F7 avançaram até a logo e identificaram as chamadas ausentes descritas
+abaixo. Não há confirmação de carregamento completo ou APK jogável; a versão
+0.1.3 ainda não foi executada no aparelho.
 
 ## Identificação do arquivo correto
 
@@ -58,10 +60,13 @@ nenhuma removida. A geração final levou aproximadamente 489,7 segundos. As
 fontes derivadas permanecem em `out/native/mk-komplete/generated/default`, fora
 do Git. Esse resultado demonstra geração estática concluída, não execução.
 
-O arquivo versionado `native/mk9_functions.toml` contém **13 intervalos
-de funções**, vinculados ao SHA-256 acima; os dois últimos foram acrescentados
-após os testes no Poco F7 descritos abaixo. Os limites foram recuperados por
-análise estática de fluxo de controle e lacunas da tabela de funções. Dois
+Na geração 0.1.2, o arquivo versionado `native/mk9_functions.toml` continha
+**13 intervalos de funções**, vinculados ao SHA-256 acima; os dois últimos
+foram acrescentados após os testes no Poco F7 descritos abaixo. A correção
+0.1.3 acrescenta o intervalo observado em execução e dois outros comprovados
+na auditoria das tabelas relacionadas, totalizando 16. Os limites foram
+recuperados por análise estática de fluxo de controle e lacunas da tabela de
+funções. Dois
 intervalos de troca de contexto conservam os registradores do convidado com
 `share_registers = true`. Não foram adicionadas instruções do jogo, funções
 fictícias ou stubs para eliminar erros de validação. Não há XEX, chaves,
@@ -97,7 +102,8 @@ Há duas questões distintas sobre fibers:
   foi aplicado. Os limites de funções e `share_registers` usados na geração não
   comprovam por si só que a semântica desses mecanismos está correta.
 
-Inicialização, gráficos, áudio, controles, carregamento e uma luta permanecem
+Os testes no aparelho comprovaram progresso da inicialização e exibição da
+logo. Gráficos completos, áudio, controles, carregamento e uma luta permanecem
 dependentes dos demais arquivos da cópia e da validação no aparelho. Uma geração
 sem erros e bibliotecas do SDK compiladas não confirmam esses comportamentos.
 
@@ -164,8 +170,39 @@ foi verificado em testes de limites, isolamento de contadores e concorrência.
 Não foi presumido um formato Windows KFLOATING_SAVE nem inventado um retorno
 de sucesso. A limitação de avisos não implementa a preservação de estado FP.
 
-A execução após a segunda correção e o carregamento completo permanecem
-dependentes do próximo teste no aparelho.
+A execução após a segunda correção chegou a outra entrada virtual ausente,
+descrita a seguir. O carregamento completo permanece não verificado.
+
+## Terceiro teste no Poco F7 e correção 0.1.3
+
+O log da versão 0.1.2 avançou além das duas chamadas anteriormente corrigidas
+e reportou uma chamada indireta não registrada a `0x832BB848`, com LR
+`0x832E0198`. A chamada em `0x832E0194` usa o slot `+0x08` da tabela de métodos.
+
+O método `0x832BB850` escreve as referências às tabelas `0x822922E8`,
+`0x822922D4` e `0x822922C0` nos offsets `+0`, `+0x20` e `+0x24` do objeto,
+respectivamente. Essas referências delimitam as tabelas auditadas. A auditoria
+dos 25 slots encontrou somente três entradas omitidas; seus destinos finais
+já estavam registrados:
+
+| Entrada | Fim exclusivo | Ajuste do receptor | Destino final |
+| --- | --- | --- | --- |
+| `0x832BB358` | `0x832BB360` | −36 bytes | `0x832BE350` |
+| `0x832BB360` | `0x832BB368` | −32 bytes | `0x832BB190` |
+| `0x832BB848` | `0x832BB850` | −36 bytes | `0x832BE380` |
+
+Cada entrada é uma função independente de 8 bytes. A correção acrescenta
+somente esses intervalos reais para geração dos corpos e registros. Não
+substitui as entradas por aliases dos destinos, pois isso perderia os ajustes
+do receptor, nem por stubs.
+
+A verificação das bibliotecas pré-compiladas passa a exigir `sub_832BB358`,
+`sub_832BB360` e `sub_832BB848`, além de `sub_829AEB48` e `sub_827EF090`, e
+preserva as exigências dos markers de diagnóstico do SDK. A validação estática
+e a inspeção desses símbolos não demonstram execução bem-sucedida.
+
+O teste da versão 0.1.3 no Poco F7 permanece pendente. Não há confirmação de
+carregamento completo, partidas, áudio ou desempenho após esta correção.
 
 ## Reproduzir as etapas locais
 
