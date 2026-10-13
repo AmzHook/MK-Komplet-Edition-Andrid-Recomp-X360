@@ -154,6 +154,11 @@ public final class ZipImporter {
                 throw new IOException("O ZIP deve conter exatamente um default.xex e os arquivos do jogo.");
             checkCancel(cancel);
             File executable = executables.get(0);
+            if (!executable.getName().equals("default.xex")) {
+                File canonicalName = new File(executable.getParentFile(), "default.xex");
+                Files.move(executable.toPath(), canonicalName.toPath());
+                executable = canonicalName;
+            }
             if (executable.length() < 24) throw new IOException("default.xex está incompleto.");
             MessageDigest digest;
             try { digest = MessageDigest.getInstance("SHA-256"); }

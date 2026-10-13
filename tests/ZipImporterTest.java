@@ -65,6 +65,12 @@ public final class ZipImporterTest {
                 require(!new File(root,"game/MK").exists(), "Old copy still current");
                 require(!new File(root,"game.backup").exists(), "Old backup retained");
             });
+            test("case-insensitive XEX name normalized for native launch", () -> {
+                ZipImporter.Result result = install(zip("MK/DEFAULT.XEX", "MK/data.bin"), root);
+                require(result.xexPath.equals("MK/default.xex"), "XEX name was not normalized");
+                require(new File(root,"game/MK/default.xex").isFile(), "Native launch XEX is missing");
+                require(Arrays.equals(Files.readAllBytes(new File(root,"game/MK/default.xex").toPath()), XEX), "Normalization changed XEX bytes");
+            });
             test("relative path traversal rejected", () -> failsPreserving(root, zip("default.xex", "../escaped.bin"), "sai da pasta"));
             test("nested path traversal rejected", () -> failsPreserving(root, zip("default.xex", "dir/../../escaped.bin"), "sai da pasta"));
             test("absolute path rejected", () -> failsPreserving(root, zip("default.xex", "/escaped.bin"), "Caminho inválido"));

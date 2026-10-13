@@ -1,0 +1,6 @@
+SDL3 Java Android integration (unmodified upstream files).
+Source: https://github.com/libsdl-org/SDL
+Commit: 8bf3b7215ad9fc3deb583c6a3a37c6c67f2e24e4
+Directory: android-project/app/src/main/java/org/libsdl/app
+Same gitlink revision used by the pinned ReXGlue Android runtime.
+License: zlib, see LICENSE.txt.

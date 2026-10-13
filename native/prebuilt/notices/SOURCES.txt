@@ -1,0 +1,13 @@
+ReXGlue Android runtime source: https://github.com/PauloUbirajara/asura-wrath-rexglue-sdk
+Pinned commit: 38b40e7424e5d3ce1afa38dca10e9a84b1aa2317
+Submodule sources and commit pins: .gitmodules and gitlinks in that SDK.
+Local SDK change: native/patches/android-fiber.patch in this repository.
+Original Android wrapper and build scripts: AmzHook/MK-Komplet-Edition-Andrid-Recomp-X360.
+Rebuild with the same XEX locally; game files are not distributed with this project.
+
+Exact public SDK/dependency sources and applied local patch: native/prebuilt/runtime-sources.tar.xz
+Available alongside the APK in the GitHub Actions artifact and in this repository.
+The source archive contains no MK XEX, generated MK code or game assets.
+FFmpeg and libmspack use LGPL2.1+; SDK code is BSD3, SDL is zlib.
+Rebuild runtime alone: python3 tools/bootstrap_native.py; bash tools/build_runtime.sh.
+Replace compatible runtime .so files in out/native/jniLibs/arm64-v8a after initial staging, then build_apk.sh --native.

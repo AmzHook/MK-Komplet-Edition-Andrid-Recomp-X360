@@ -1,0 +1,71 @@
+name: Package MK Experimental APK
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  package:
+    name: Package verified precompiled ARM64 runtime
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    env:
+      MK_ANDROID_TOOLS: /tmp/mk-android
+    steps:
+      - name: Check out packaging source and native inputs
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+
+      - name: Install verified JDK and Android tools
+        run: python3 tools/bootstrap_android.py
+
+      - name: Test importer and XEX metadata guards
+        run: |
+          python3 -m unittest discover -s tests -p 'test_*.py' -v
+          bash tools/test_importer.sh
+
+      - name: Verify checksums, ARM64 ELF and source notices
+        run: python3 tools/prepare_prebuilt_runtime.py
+
+      - name: Compile Java, package native libraries and verify signature
+        run: bash tools/build_apk.sh --native
+
+      - name: Verify exact packaged libraries, activities and notices
+        run: python3 tools/verify_native_apk.py
+
+      - name: Upload experimental APK
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: MK-Experimental-0.1.0
+          path: |
+            out/apk/MK-Experimental-0.1.0.apk
+            out/apk/MK-Experimental-0.1.0.apk.sha256
+            native/prebuilt/notices/SOURCES.txt
+          if-no-files-found: error
+          retention-days: 30
+          compression-level: 0
+
+      - name: Upload corresponding public runtime sources
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: MK-Experimental-Runtime-Sources
+          path: native/prebuilt/runtime-sources.tar.xz
+          if-no-files-found: error
+          retention-days: 30
+          compression-level: 0
+
+      - name: Record actual build scope
+        run: |
+          cat >> "$GITHUB_STEP_SUMMARY" <<'SUMMARY'
+          **MK Experimental 0.1.0** — Android ARM64, Android 9+, Vulkan.
+
+          This job compiles the Java app and packages checksum-verified **precompiled native libraries**. It does not run ReXGlue codegen or compile an XEX on the runner. No XEX, ISO or game asset is included. The game library contains title-specific recompiled code; import the matching XEX and complete game assets locally.
+
+          The companion artifact MK-Experimental-Runtime-Sources includes public runtime/dependency sources for rebuilding librexruntime without game files. The same source archive is retained under native/prebuilt in the repository. See README for replacement/repackaging instructions.
+
+          **Device startup and gameplay have not been validated.** Synthetic tests, ELF checks and APK signature verification do not establish playability. A fresh runner uses a new development signer; updating an installation with a different signer may require uninstalling, which removes imported files.
+          SUMMARY

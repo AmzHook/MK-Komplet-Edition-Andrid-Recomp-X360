@@ -26,6 +26,9 @@ jobs:
       - name: Test ZIP extraction and recovery
         run: bash tools/test_importer.sh
 
+      - name: Test XEX metadata inspection
+        run: python3 -m unittest discover -s tests -p 'test_*.py' -v
+
       - name: Compile and verify APK
         run: bash tools/build_apk.sh
 

@@ -1,0 +1,17 @@
+# Verified leaf-function boundaries for MK Title 575207FD, Media6579DAFA, version8.
+# Input SHA256: e51751328751287b2a6113c815b99f470d1ea0c88f5d9d9f9b1942a28b3e7f6d
+# Boundaries were recovered from PPC disassembly, PDATA gaps and closed CFGs.
+# This file contains address metadata only; no game instructions or stubs.
+[functions]
+0x82F6A238 = { end = 0x82F6A2A8 }
+0x82E6F378 = { end = 0x82E6F400 }
+0x82AC5140 = { end = 0x82AC5148 }
+0x82780F40 = { end = 0x82780F48 }
+0x8240AA80 = { end = 0x8240AAAC }
+0x82AE9130 = { end = 0x82AE91C4 }
+0x82E54080 = { end = 0x82E54110 }
+0x82E6F490 = { end = 0x82E6F518 }
+0x830179C0 = { end = 0x83017A3C }
+# Real context-switch leaf and its thunk; preserve live guest registers.
+0x82BDCC80 = { end = 0x82BDD08C, share_registers = true }
+0x82BDC380 = { end = 0x82BDC384, share_registers = true }

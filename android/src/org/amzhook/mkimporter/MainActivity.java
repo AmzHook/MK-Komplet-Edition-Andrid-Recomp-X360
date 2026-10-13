@@ -16,6 +16,7 @@ import android.view.WindowManager;
 import android.widget.*;
 import java.io.*;
 import java.util.Locale;
+import java.util.Properties;
 import java.util.concurrent.*;
 import java.util.concurrent.atomic.AtomicBoolean;
 
@@ -25,11 +26,13 @@ public final class MainActivity extends Activity {
     private final Handler ui = new Handler(Looper.getMainLooper());
     private final AtomicBoolean cancel = new AtomicBoolean();
     private TextView status, summary, path, note;
-    private Button importButton, cancelButton, detailsButton, removeButton;
+    private Button importButton, cancelButton, detailsButton, removeButton, playButton, logButton;
     private ProgressBar progress;
     private ZipImporter.Result installed;
     private boolean busy, destroyed;
     private File storage;
+    private String expectedHash;
+    private boolean nativeAvailable;
     private final int gold = Color.rgb(238, 184, 73);
     private final int muted = Color.rgb(181, 184, 192);
 
@@ -46,6 +49,13 @@ public final class MainActivity extends Activity {
     @Override public void onCreate(Bundle state) {
         super.onCreate(state);
         storage = new File(getFilesDir(), "mk-library");
+        Properties runtime = new Properties();
+        try (InputStream input = getAssets().open("runtime.properties")) {
+            runtime.load(input);
+            String hash = runtime.getProperty("xex_sha256", "");
+            if (hash.matches("[0-9a-f]{64}")) expectedHash = hash;
+        } catch (IOException ignored) { }
+        nativeAvailable = expectedHash != null && new File(getApplicationInfo().nativeLibraryDir, "libmk_komplete.so").isFile();
         getWindow().setStatusBarColor(Color.rgb(15,17,23));
         getWindow().setNavigationBarColor(Color.rgb(15,17,23));
         ScrollView scroll = new ScrollView(this); scroll.setFillViewport(true);
@@ -58,10 +68,12 @@ public final class MainActivity extends Activity {
                     insets.getSystemWindowInsetRight(), insets.getSystemWindowInsetBottom());
             return insets;
         });
-        content.addView(text("MK  /  IMPORTADOR", 13, gold));
+        content.addView(text(nativeAvailable ? "MK  /  EXPERIMENTAL" : "MK  /  IMPORTADOR", 13, gold));
         content.addView(text("Sua cópia.\nNo seu aparelho.", 32, Color.WHITE));
         content.addView(text("Importe um ZIP com o default.xex e as pastas extraídas da sua cópia de Mortal Kombat Komplete Edition para Xbox 360.", 16, muted));
-        TextView limitation = text("Esta versão importa os arquivos. A execução de Mortal Kombat ainda não está disponível.", 16, gold);
+        TextView limitation = text(nativeAvailable
+                ? "Versão experimental. Importe sua cópia para testar a inicialização; funcionamento e desempenho ainda precisam ser verificados."
+                : "Esta versão importa os arquivos. A execução de Mortal Kombat ainda não está disponível.", 16, gold);
         limitation.setPadding(dp(16), dp(16), dp(16), dp(16));
         limitation.setBackgroundColor(Color.rgb(40,34,24)); content.addView(limitation);
         status = text("Nenhuma cópia importada", 21, Color.WHITE); content.addView(status);
@@ -72,15 +84,29 @@ public final class MainActivity extends Activity {
         path = text("", 13, muted); path.setMaxLines(3); content.addView(path);
         cancelButton = button("Cancelar importação"); cancelButton.setVisibility(View.GONE); content.addView(cancelButton);
         detailsButton = button("Detalhes da importação"); content.addView(detailsButton);
+        playButton = button("Testar inicialização do jogo");
+        playButton.setVisibility(nativeAvailable ? View.VISIBLE : View.GONE); content.addView(playButton);
+        logButton = button("Ver log de inicialização");
+        logButton.setVisibility(nativeAvailable ? View.VISIBLE : View.GONE); content.addView(logButton);
         removeButton = button("Remover arquivos importados"); content.addView(removeButton);
         note = text("Os arquivos ficam no armazenamento privado deste aplicativo. Não há envio pela rede. Desinstalar o APK remove a cópia importada.\n\nReserve espaço para o conteúdo extraído; o ZIP original permanece no local escolhido.", 13, muted);
         content.addView(note);
-        TextView footer = text("VERSÃO 0.1.0  ·  IMPORTAÇÃO LOCAL", 12, muted);
+        TextView footer = text(nativeAvailable ? "VERSÃO 0.1.0  ·  INICIALIZAÇÃO EXPERIMENTAL" : "VERSÃO 0.1.0  ·  IMPORTAÇÃO LOCAL", 12, muted);
         footer.setGravity(Gravity.CENTER); content.addView(footer);
         setContentView(scroll);
         importButton.setOnClickListener(view -> pickZip());
         cancelButton.setOnClickListener(view -> { cancel.set(true); cancelButton.setEnabled(false); status.setText("Cancelando…"); });
         detailsButton.setOnClickListener(view -> showDetails());
+        playButton.setOnClickListener(view -> {
+            if (!nativeAvailable || installed == null || !installed.sha256.equals(expectedHash)) return;
+            File gameRoot = new File(new File(storage, "game"), installed.xexPath).getParentFile();
+            Intent game = new Intent().setClassName(getPackageName(), getPackageName() + ".GameActivity");
+            game.putExtra("game_root", gameRoot.getAbsolutePath());
+            game.putExtra("cache_root", new File(getCacheDir(), "mk-runtime").getAbsolutePath());
+            game.putExtra("user_root", new File(getFilesDir(), "mk-user").getAbsolutePath());
+            startActivity(game);
+        });
+        logButton.setOnClickListener(view -> showRuntimeLog());
         removeButton.setOnClickListener(view -> new AlertDialog.Builder(this)
                 .setTitle("Remover a cópia importada?")
                 .setMessage("Os arquivos dentro do aplicativo serão apagados. O ZIP original será preservado.")
@@ -99,6 +125,7 @@ public final class MainActivity extends Activity {
     private void setBusy(boolean value) {
         busy = value; importButton.setEnabled(!value);
         detailsButton.setEnabled(!value && installed != null); removeButton.setEnabled(!value && installed != null);
+        playButton.setEnabled(!value && nativeAvailable && installed != null && installed.sha256.equals(expectedHash));
         progress.setVisibility(value ? View.VISIBLE : View.GONE);
         cancelButton.setVisibility(View.GONE);
         if (value) getWindow().addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
@@ -108,8 +135,11 @@ public final class MainActivity extends Activity {
     private void refresh() {
         status.setText(installed == null ? "Nenhuma cópia importada" : "Arquivos importados");
         summary.setText(installed == null ? "Selecione o ZIP para começar." : installed.files + " arquivos · " + size(installed.bytes));
+        if (nativeAvailable && installed != null && !installed.sha256.equals(expectedHash))
+            summary.append("\nEste executável não corresponde à versão usada nesta build. Importe a cópia com o XEX compatível.");
         path.setText("");
         detailsButton.setEnabled(!busy && installed != null); removeButton.setEnabled(!busy && installed != null);
+        playButton.setEnabled(!busy && nativeAvailable && installed != null && installed.sha256.equals(expectedHash));
     }
     private void pickZip() {
         if (installed != null) {
@@ -157,11 +187,33 @@ public final class MainActivity extends Activity {
         if (installed == null) return;
         String report = "MK Importador 0.1.0\nArquivos: " + installed.files + "\nTamanho: " + installed.bytes
                 + " bytes\nXEX: " + installed.xexPath + "\nSHA-256: " + installed.sha256
-                + "\n\nCabeçalho XEX2 verificado. Isso não confirma que o executável é do MK ou que é compatível.\nExecução do jogo: não integrada.";
+                + "\n\nCabeçalho XEX2 verificado. Isso não confirma que o executável é do MK ou que é compatível.\nRuntime: "
+                + (nativeAvailable ? "experimental; inicialização não validada em aparelho." : "não integrado nesta build.");
         new AlertDialog.Builder(this).setTitle("Detalhes da importação").setMessage(report)
                 .setPositiveButton("Fechar", null).setNeutralButton("Copiar", (dialog, which) -> {
                     ClipboardManager clipboard = (ClipboardManager)getSystemService(CLIPBOARD_SERVICE);
                     clipboard.setPrimaryClip(ClipData.newPlainText("MK Importador", report));
+                }).show();
+    }
+    private void showRuntimeLog() {
+        File log = new File(getFilesDir(), "mk-user/logs/mk_komplete.log");
+        String content;
+        try (RandomAccessFile input = new RandomAccessFile(log, "r")) {
+            int length = (int)Math.min(input.length(), 128 * 1024);
+            input.seek(input.length() - length);
+            byte[] bytes = new byte[length]; input.readFully(bytes);
+            content = new String(bytes, java.nio.charset.StandardCharsets.UTF_8);
+        } catch (IOException error) {
+            content = "Ainda não há log salvo. Tente iniciar o jogo e volte a esta tela.";
+        }
+        final String report = content;
+        TextView viewer = text(report, 12, Color.WHITE); viewer.setTextIsSelectable(true);
+        viewer.setPadding(dp(16), dp(12), dp(16), dp(12));
+        ScrollView scroll = new ScrollView(this); scroll.addView(viewer);
+        new AlertDialog.Builder(this).setTitle("Log de inicialização").setView(scroll)
+                .setPositiveButton("Fechar", null).setNeutralButton("Copiar", (dialog, which) -> {
+                    ClipboardManager clipboard = (ClipboardManager)getSystemService(CLIPBOARD_SERVICE);
+                    clipboard.setPrimaryClip(ClipData.newPlainText("Log MK", report));
                 }).show();
     }
     private void removeGame() {

@@ -1,0 +1,216 @@
+Replace fabricated Bionic jmp_buf fields with owned AAPCS64 register storage.
+Base: asura-wrath-rexglue-sdk 38b40e7424e5d3ce1afa38dca10e9a84b1aa2317.
+Public Fiber header/ABI retained; existing array is addressed only as raw bytes.
+Explicit context offsets, capacity/alignment assertions and memcpy initialization
+avoid private field assumptions, C++ type punning, and object-lifetime changes.
+Preserves x19-x30, SP, d8-d15, FPCR/FPSR; Android's x18 is untouched.
+BSD-3-Clause source notices/reference commits retained in assembly.
+
+diff --git a/src/core/fiber_posix.cpp b/src/core/fiber_posix.cpp
+--- a/src/core/fiber_posix.cpp
++++ b/src/core/fiber_posix.cpp
+@@ -22,12 +22,48 @@
+ #include <rex/thread/fiber.h>
+ 
+ #include <cassert>
++#include <cstdlib>
++#include <cstring>
++#include <type_traits>
+ 
+ namespace rex::thread {
+ 
+ thread_local Fiber* Fiber::tls_current_ = nullptr;
+ 
+ #if REX_PLATFORM_ANDROID
++#if !REX_ARCH_ARM64
++#error "The Android fiber backend requires AArch64"
++#endif
++#if __has_feature(shadow_call_stack)
++#error "This fiber backend does not support ShadowCallStack instrumentation"
++#endif
++
++namespace {
++// Explicit AAPCS64 state, independent of Bionic's field layout/mangling.
++struct AndroidFiberContext {
++  uint64_t x[12]{};  // x19..x30
++  uint64_t sp{};
++  uint64_t d[8]{};   // low 64 bits of v8..v15, as required by AAPCS64
++  uint64_t fpcr{};
++  uint64_t fpsr{};
++};
++static_assert(offsetof(AndroidFiberContext, x) == 0);
++static_assert(offsetof(AndroidFiberContext, sp) == 96);
++static_assert(offsetof(AndroidFiberContext, d) == 104);
++static_assert(offsetof(AndroidFiberContext, fpcr) == 168);
++static_assert(offsetof(AndroidFiberContext, fpsr) == 176);
++static_assert(sizeof(AndroidFiberContext) == 184);
++static_assert(std::is_trivially_copyable_v<AndroidFiberContext>);
++// Retain the public Fiber ABI. Its existing array is used only as owned byte
++// storage; memcpy and the assembly routine never interpret a Bionic jmp_buf.
++// No Context object is type-punned or placement-constructed inside the array.
++static_assert(sizeof(AndroidFiberContext) <= sizeof(jmp_buf));
++static_assert(alignof(AndroidFiberContext) <= alignof(jmp_buf));
++}  // namespace
++
++extern "C" void rex_fiber_switch_aarch64(void* from_storage,
++                                         const void* to_storage);
++extern "C" void rex_fiber_start_aarch64();
+ 
+ Fiber* Fiber::ConvertCurrentThread() {
+   auto* f = new Fiber();
+@@ -37,21 +73,24 @@
+ }
+ 
+ Fiber* Fiber::Create(size_t stack_size, void (*entry)(void*), void* arg) {
++  if (!entry || stack_size < 16) {
++    return nullptr;
++  }
+   auto* f = new Fiber();
+   f->entry_ = entry;
+   f->arg_ = arg;
+   f->stack_.resize(stack_size);
+ 
+-  setjmp(f->env_);
+-  uintptr_t* env_ptr = reinterpret_cast<uintptr_t*>(f->env_);
+   uintptr_t stack_top = reinterpret_cast<uintptr_t>(f->stack_.data() + f->stack_.size());
+-  stack_top &= ~15ULL;  // 16-byte alignment
+-
+-#if defined(__aarch64__)
+-  // On Bionic aarch64 jmp_buf: [11] is lr, [12] is sp
+-  env_ptr[11] = reinterpret_cast<uintptr_t>(&Fiber::Trampoline);
+-  env_ptr[12] = stack_top;
+-#endif
++  stack_top &= ~uintptr_t(15);  // AAPCS64 requires a 16-byte aligned SP.
++  AndroidFiberContext initial{};
++  initial.x[0] = reinterpret_cast<uintptr_t>(&Fiber::Trampoline);  // x19
++  initial.x[11] = reinterpret_cast<uintptr_t>(&rex_fiber_start_aarch64);  // LR
++  initial.sp = stack_top;
++  // New fibers inherit FP control mode, with clear exception flags. Every
++  // subsequent switch preserves FPCR and FPSR. x18 remains thread-owned.
++  asm volatile("mrs %0, fpcr" : "=r"(initial.fpcr));
++  std::memcpy(f->env_, &initial, sizeof(initial));
+ 
+   return f;
+ }
+@@ -59,14 +98,15 @@
+ /*static*/ void Fiber::Trampoline() {
+   Fiber* f = tls_current_;
+   f->entry_(f->arg_);
++  // Fibers must switch away before returning; enforce this in Release too.
++  std::abort();
+ }
+ 
+ void Fiber::SwitchTo(Fiber* target) {
+   Fiber* from = tls_current_;
+   tls_current_ = target;
+-  if (setjmp(from->env_) == 0) {
+-    longjmp(target->env_, 1);
+-  }
++  rex_fiber_switch_aarch64(static_cast<void*>(from->env_),
++                           static_cast<const void*>(target->env_));
+ }
+ 
+ void Fiber::Destroy() {
+diff --git a/src/core/CMakeLists.txt b/src/core/CMakeLists.txt
+--- a/src/core/CMakeLists.txt
++++ b/src/core/CMakeLists.txt
+@@ -23,6 +23,14 @@
+     vec128.cpp
+ )
+ add_library(rex::core ALIAS rexcore)
++
++if(ANDROID)
++    if(NOT CMAKE_SYSTEM_PROCESSOR MATCHES "^(aarch64|ARM64|arm64)$")
++        message(FATAL_ERROR "The Android fiber backend requires AArch64")
++    endif()
++    enable_language(ASM)
++    target_sources(rexcore PRIVATE fiber_android_aarch64.S)
++endif()
+ 
+ if(APPLE OR ANDROID)
+     # Apple/Android libc++ still gates std::jthread/std::stop_token behind the
+diff --git a/src/core/fiber_android_aarch64.S b/src/core/fiber_android_aarch64.S
+new file mode 100644
+--- /dev/null
++++ b/src/core/fiber_android_aarch64.S
+@@ -0,0 +1,80 @@
++/*
++ * Android AAPCS64 cooperative fiber context switch.
++ * Copyright (c) 2026 naughtybear-restuff-android port.
++ * Copyright (c) 2026 Tom Clay <tomc@tctechstuff.com>.
++ * BSD 3-Clause License; see LICENSE in the SDK root.
++ *
++ * Adapted from the Android fiber overlay carried by ForzaHorizon2Recomp:
++ * github.com/gerisson1996/ForzaHorizon2Recomp-Android-RexGlue
++ * commit ffab1cc36823a98686b3b83028f493f64376d834.
++ * FPCR/FPSR preservation follows the BSD ReXGlue/ShiftGlue ARM64 backend:
++ * github.com/deivid22srk/shiftglue-sdk
++ * commit 404fa7eecd4d1900d6b06b261b2eb352d4ad0642.
++ *
++ * Layout is checked by the explicit context in fiber_posix.cpp.
++ * x0: context to save; x1: context to restore. x9/x10 are call-clobbered.
++ * x18 remains untouched: it belongs to the current Android OS thread.
++ */
++#if !defined(__ANDROID__) || !defined(__aarch64__)
++#error "fiber_android_aarch64.S requires Android AArch64"
++#endif
++
++.text
++.p2align 4
++.global rex_fiber_switch_aarch64
++.hidden rex_fiber_switch_aarch64
++.type rex_fiber_switch_aarch64, %function
++rex_fiber_switch_aarch64:
++    .cfi_startproc
++    hint #34                         // BTI c on supporting CPUs; NOP otherwise.
++    stp x19, x20, [x0, #0]
++    stp x21, x22, [x0, #16]
++    stp x23, x24, [x0, #32]
++    stp x25, x26, [x0, #48]
++    stp x27, x28, [x0, #64]
++    stp x29, x30, [x0, #80]
++    mov x9, sp
++    str x9, [x0, #96]
++    stp d8, d9, [x0, #104]
++    stp d10, d11, [x0, #120]
++    stp d12, d13, [x0, #136]
++    stp d14, d15, [x0, #152]
++    mrs x9, fpcr
++    mrs x10, fpsr
++    stp x9, x10, [x0, #168]
++
++    .cfi_undefined x30                // Context restoration is an unwind boundary.
++    ldp x19, x20, [x1, #0]
++    ldp x21, x22, [x1, #16]
++    ldp x23, x24, [x1, #32]
++    ldp x25, x26, [x1, #48]
++    ldp x27, x28, [x1, #64]
++    ldp x29, x30, [x1, #80]
++    ldp d8, d9, [x1, #104]
++    ldp d10, d11, [x1, #120]
++    ldp d12, d13, [x1, #136]
++    ldp d14, d15, [x1, #152]
++    ldp x9, x10, [x1, #168]
++    msr fpcr, x9
++    msr fpsr, x10
++    ldr x9, [x1, #96]
++    mov sp, x9
++    ret
++    .cfi_endproc
++.size rex_fiber_switch_aarch64, .-rex_fiber_switch_aarch64
++
++// Initial entry uses a real call to the C++ trampoline and an explicit
++// unwind root, rather than fabricating a C++ frame with a self-return LR.
++.p2align 4
++.global rex_fiber_start_aarch64
++.hidden rex_fiber_start_aarch64
++.type rex_fiber_start_aarch64, %function
++rex_fiber_start_aarch64:
++    .cfi_startproc
++    .cfi_undefined x30
++    hint #34
++    blr x19
++    brk #0                           // Defensive trap if the trampoline returns.
++    .cfi_endproc
++.size rex_fiber_start_aarch64, .-rex_fiber_start_aarch64
++.section .note.GNU-stack,"",%progbits
