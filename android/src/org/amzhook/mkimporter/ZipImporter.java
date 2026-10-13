@@ -33,11 +33,11 @@ public final class ZipImporter {
         public Cancelled() { super("Importação cancelada."); }
     }
 
-    private static void checkCancel(AtomicBoolean cancel) throws Cancelled {
+    static void checkCancel(AtomicBoolean cancel) throws Cancelled {
         if (cancel.get() || Thread.currentThread().isInterrupted()) throw new Cancelled();
     }
 
-    private static File safeDestination(File root, String name) throws IOException {
+    static File safeDestination(File root, String name) throws IOException {
         if (name.isEmpty() || name.length() > 4096 || name.startsWith("/")
                 || name.indexOf('\\') >= 0 || name.indexOf(':') >= 0 || name.indexOf('\0') >= 0)
             throw new IOException("Caminho inválido no ZIP.");
@@ -51,7 +51,7 @@ public final class ZipImporter {
         return target;
     }
 
-    private static void ensureDirectory(File directory) throws IOException {
+    static void ensureDirectory(File directory) throws IOException {
         if (!directory.isDirectory() && !directory.mkdirs())
             throw new IOException("Não foi possível criar a pasta de importação.");
     }
@@ -150,52 +150,62 @@ public final class ZipImporter {
                 }
             }
             if (files == 0) throw new IOException("O ZIP está vazio ou não é um arquivo ZIP válido.");
-            if (executables.size() != 1)
-                throw new IOException("O ZIP deve conter exatamente um default.xex e os arquivos do jogo.");
-            checkCancel(cancel);
-            File executable = executables.get(0);
-            if (!executable.getName().equals("default.xex")) {
-                File canonicalName = new File(executable.getParentFile(), "default.xex");
-                Files.move(executable.toPath(), canonicalName.toPath());
-                executable = canonicalName;
-            }
-            if (executable.length() < 24) throw new IOException("default.xex está incompleto.");
-            MessageDigest digest;
-            try { digest = MessageDigest.getInstance("SHA-256"); }
-            catch (NoSuchAlgorithmException e) { throw new IOException(e); }
-            try (InputStream in = new FileInputStream(executable)) {
-                byte[] header = new byte[4];
-                if (in.read(header) != 4 || !Arrays.equals(header, new byte[]{'X','E','X','2'}))
-                    throw new IOException("default.xex não possui o cabeçalho XEX2 esperado.");
-                digest.update(header);
-                int count;
-                while ((count = in.read(buffer)) != -1) { checkCancel(cancel); digest.update(buffer, 0, count); }
-            }
-            StringBuilder hash = new StringBuilder();
-            for (byte b : digest.digest()) hash.append(String.format(Locale.ROOT, "%02x", b & 255));
-            String path = staging.toPath().relativize(executable.toPath()).toString();
-            Result result = new Result(path, hash.toString(), files, total);
-            Properties metadata = new Properties();
-            metadata.setProperty("xex", path); metadata.setProperty("sha256", result.sha256);
-            metadata.setProperty("files", Integer.toString(files)); metadata.setProperty("bytes", Long.toString(total));
-            try (OutputStream out = new FileOutputStream(new File(staging, ".mk-import.properties"))) {
-                metadata.store(out, "MK Importador: metadata only, no game execution");
-            }
-            checkCancel(cancel);
-            File current = new File(appRoot, "game"), backup = new File(appRoot, "game.backup");
-            if (current.exists()) Files.move(current.toPath(), backup.toPath());
-            try { Files.move(staging.toPath(), current.toPath()); }
-            catch (IOException e) {
-                if (backup.exists()) Files.move(backup.toPath(), current.toPath());
-                throw e;
-            }
+            Result result = commitStaging(appRoot, staging, files, total, executables,
+                    cancel, progress, "O ZIP");
             committed = true;
-            // Backup cleanup can be retried at startup without invalidating the successful import.
-            try { deleteTree(backup); } catch (IOException ignored) { }
-            progress.update(files, total, path);
             return result;
         } finally {
             if (!committed) deleteTree(staging);
         }
+    }
+
+    /** Validates the extracted XEX and commits an isolated staging directory. */
+    static Result commitStaging(File appRoot, File staging, int files, long total,
+                                List<File> executables, AtomicBoolean cancel,
+                                Progress progress, String sourceName) throws IOException {
+        byte[] buffer = new byte[256 * 1024];
+        if (executables.size() != 1)
+            throw new IOException(sourceName + " deve conter exatamente um default.xex e os arquivos do jogo.");
+        checkCancel(cancel);
+        File executable = executables.get(0);
+        if (!executable.getName().equals("default.xex")) {
+            File canonicalName = new File(executable.getParentFile(), "default.xex");
+            Files.move(executable.toPath(), canonicalName.toPath());
+            executable = canonicalName;
+        }
+        if (executable.length() < 24) throw new IOException("default.xex está incompleto.");
+        MessageDigest digest;
+        try { digest = MessageDigest.getInstance("SHA-256"); }
+        catch (NoSuchAlgorithmException e) { throw new IOException(e); }
+        try (InputStream in = new FileInputStream(executable)) {
+            byte[] header = new byte[4];
+            if (in.read(header) != 4 || !Arrays.equals(header, new byte[]{'X','E','X','2'}))
+                throw new IOException("default.xex não possui o cabeçalho XEX2 esperado.");
+            digest.update(header);
+            int count;
+            while ((count = in.read(buffer)) != -1) { checkCancel(cancel); digest.update(buffer, 0, count); }
+        }
+        StringBuilder hash = new StringBuilder();
+        for (byte b : digest.digest()) hash.append(String.format(Locale.ROOT, "%02x", b & 255));
+        String path = staging.toPath().relativize(executable.toPath()).toString();
+        Result result = new Result(path, hash.toString(), files, total);
+        Properties metadata = new Properties();
+        metadata.setProperty("xex", path); metadata.setProperty("sha256", result.sha256);
+        metadata.setProperty("files", Integer.toString(files)); metadata.setProperty("bytes", Long.toString(total));
+        try (OutputStream out = new FileOutputStream(new File(staging, ".mk-import.properties"))) {
+            metadata.store(out, "MK Importador: metadata only, no game execution");
+        }
+        checkCancel(cancel);
+        File current = new File(appRoot, "game"), backup = new File(appRoot, "game.backup");
+        if (current.exists()) Files.move(current.toPath(), backup.toPath());
+        try { Files.move(staging.toPath(), current.toPath()); }
+        catch (IOException e) {
+            if (backup.exists()) Files.move(backup.toPath(), current.toPath());
+            throw e;
+        }
+        // Backup cleanup can be retried at startup without invalidating the successful import.
+        try { deleteTree(backup); } catch (IOException ignored) { }
+        progress.update(files, total, path);
+        return result;
     }
 }

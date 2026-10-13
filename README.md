@@ -1,18 +1,40 @@
 # MK Komplete · Android experimental
 
 Integração experimental de Mortal Kombat Komplete Edition para Xbox 360 com
-ReXGlue em Android ARM64. O aplicativo importa os arquivos do jogo por ZIP e
-oferece um botão para testar a inicialização do runtime nativo. No teste da
+ReXGlue em Android ARM64. O aplicativo importa os arquivos do jogo por ZIP ou
+ISO e oferece um botão para testar a inicialização do runtime nativo. No teste da
 versão 0.1.3, o usuário relatou a logo do Mortal Kombat antes do vídeo da
 NetherRealm, seguida pelo fechamento. **Carregamento completo, partidas, áudio
 e desempenho ainda não foram verificados.**
 
 O APK experimental contém código nativo gerado para um executável específico.
-O usuário fornece o XEX e as demais pastas do jogo; o aplicativo não baixa esses
-arquivos. O APK `MK-Importador` continua disponível como variante que apenas
-importa arquivos, sem execução.
+O usuário fornece a ISO ou um ZIP com o XEX e as demais pastas do jogo; o
+aplicativo não baixa esses arquivos. O APK `MK-Importador` continua disponível
+como variante que apenas importa arquivos, sem execução.
 
-## Atualização experimental 0.1.5
+## Atualização experimental 0.1.6
+
+Adiciona a importação direta de ISO Xbox 360 com uma partição XDVDFS em setores
+de 2048 bytes. O botão **Importar ZIP ou ISO** extrai os arquivos da partição do
+jogo para a mesma pasta privada usada pelo importador de ZIP. Não é preciso
+extrair a ISO em outro programa antes de selecionar o arquivo no aplicativo.
+
+Arquivos que permitem leitura por posição são lidos diretamente. Se o local
+selecionado oferecer apenas leitura sequencial, o aplicativo prepara uma cópia
+temporária da ISO, limitada a 24 GiB, com limpeza após a tentativa e ao abrir o
+aplicativo novamente. O XEX extraído passa pelas mesmas verificações e o botão
+de inicialização continua exigindo o SHA-256 da build. Os 21 intervalos de
+funções do runtime permanecem os mesmos da versão 0.1.5.
+
+Passaram 97 testes Java de importação e 29 testes Python do projeto. A
+compilação ARM64, a assinatura e a verificação do conteúdo do APK concluíram.
+
+Os testes de importação usam imagens sintéticas. **Nenhuma ISO real do MK foi
+fornecida para validar este recurso; o teste da versão 0.1.6 no Poco F7 e a
+jogabilidade continuam pendentes.** Os formatos aceitos e detalhes de validação
+estão em [Importação de ISO](docs/iso-import.md).
+
+## Atualização anterior 0.1.5
 
 Corrige o método virtual omitido `0x83128D48`, encontrado no log da versão
 0.1.4. Ele retorna o ponteiro armazenado no campo `+0x34` do objeto. A auditoria
@@ -72,12 +94,14 @@ O teste dessa versão superou a falha anterior e encontrou a entrada ausente
 
 ## Instalação e teste
 
-1. Instale `MK-Experimental-0.1.5.apk` em Android 9 ou mais recente, ARM64 e Vulkan.
-2. Toque em **Importar ZIP**. Selecione um ZIP contendo exatamente um
-   `default.xex` e todas as demais pastas da sua cópia extraída do jogo. Uma pasta
-   externa envolvendo esses arquivos é aceita. Uma ISO precisa ser extraída
-   antes; somente o XEX não fornece os dados necessários ao jogo.
-3. Mantenha o aplicativo aberto até terminar a importação.
+1. Instale `MK-Experimental-0.1.6.apk` em Android 9 ou mais recente, ARM64 e Vulkan.
+2. Toque em **Importar ZIP ou ISO**. Selecione a ISO Xbox 360 da sua cópia do
+   jogo ou um ZIP contendo exatamente um `default.xex` e todas as demais pastas
+   do jogo. No ZIP, uma pasta externa envolvendo esses arquivos é aceita.
+   Somente o XEX não fornece os dados necessários ao jogo.
+3. Mantenha o aplicativo aberto até terminar a importação. Se aparecer
+   **Preparando ISO para importação…**, aguarde a cópia temporária e a extração.
+   **Cancelar importação** interrompe a operação e mantém a cópia anterior.
 4. Toque em **Testar inicialização do jogo**. Esta versão usa a entrada SDL e
    requer um controle físico compatível; ainda não possui controles de toque.
 5. Depois de uma tentativa, **Ver log de inicialização** permite ler e copiar o
@@ -96,15 +120,25 @@ O botão de inicialização só é habilitado para o mesmo XEX usado na geraçã
 
 Os arquivos são extraídos no armazenamento privado do aplicativo. Não há envio
 pela rede nem permissão de acesso amplo ao armazenamento. Desinstalar remove a
-cópia importada; preserve o ZIP original. Uma substituição é validada em uma
-pasta temporária e falhas ou cancelamento preservam a cópia anterior.
+cópia importada; preserve o ZIP ou a ISO original. Uma substituição é validada
+em uma pasta temporária e falhas ou cancelamento preservam a cópia anterior.
+
+Reserve espaço para o arquivo original e os arquivos extraídos. Alguns locais
+de armazenamento também exigem uma cópia temporária da ISO; selecionar um
+arquivo local que permita leitura por posição evita essa cópia. Ao substituir
+um jogo importado, a cópia anterior também ocupa espaço até a nova importação
+ser concluída. A extração da ISO mantém uma reserva de 64 MiB de espaço livre.
+
+São aceitas imagens XDVDFS da partição do jogo e imagens XGD2 ou XGD3 com setores
+de 2048 bytes. Imagens raw de 2352 bytes por setor, ISO 9660 sem XDVDFS, imagens
+comprimidas, pacotes GOD e ISOs divididas em partes não são aceitos.
 
 ## APK pelo GitHub Actions
 
 Abra [Actions](https://github.com/AmzHook/MK-Komplet-Edition-Andrid-Recomp-X360/actions).
 O workflow **Package MK Experimental APK** compila o aplicativo Java, verifica
 as bibliotecas ARM64 previamente compiladas e empacota o APK experimental.
-Baixe o artefato `MK-Experimental-0.1.5` de uma execução concluída com sucesso.
+Baixe o artefato `MK-Experimental-0.1.6` de uma execução concluída com sucesso.
 O workflow **Build MK Importador APK** produz a variante de importação.
 O workflow experimental está habilitado para testes no aparelho. A publicação
 da variante de importação é opcional e exige a variável de repositório
@@ -116,7 +150,7 @@ artefatos incluem APK e checksum, ficam disponíveis por 30 dias e seu download
 pode exigir login no GitHub. Após extrair, confira:
 
 ```bash
-sha256sum -c MK-Experimental-0.1.5.apk.sha256
+sha256sum -c MK-Experimental-0.1.6.apk.sha256
 ```
 
 A assinatura é de desenvolvimento. Cada runner gera uma chave nova; uma build
@@ -138,7 +172,7 @@ python3 tools/prepare_prebuilt_runtime.py
 bash tools/build_apk.sh --native
 ```
 
-Saída: `out/apk/MK-Experimental-0.1.5.apk`. Para compilar apenas o importador,
+Saída: `out/apk/MK-Experimental-0.1.6.apk`. Para compilar apenas o importador,
 execute `bash tools/build_apk.sh`.
 
 ## Recompilação nativa a partir da sua cópia
@@ -169,14 +203,18 @@ fibers foi aplicado ao MK.
 
 ## Validação e limites
 
-Os testes sintéticos verificam extração, CRC, substituição, recuperação,
-cancelamento, limites e rejeição de caminhos inseguros; os testes Python
+Os testes sintéticos verificam extração de ZIP e ISO, CRC de ZIP, substituição,
+recuperação, cancelamento, limites e rejeição de caminhos inseguros. Os testes
+de ISO também cobrem os três offsets de partição, tabelas de diretórios,
+imagens truncadas e acessos além de 4 GiB; os testes Python
 verificam a análise de metadados e a associação dos intervalos ao XEX correto.
 Não usam arquivos reais do jogo e não substituem teste em aparelho.
 
-O importador rejeita caminhos fora do destino, colisões de nomes e ZIPs com mais
-de 100.000 entradas, 24 GiB extraídos ou 12 GiB em um arquivo. Esses limites usam
-o tamanho realmente extraído.
+O importador rejeita caminhos fora do destino, colisões de nomes e importações com
+mais de 100.000 entradas, 24 GiB extraídos ou 12 GiB em um arquivo. No ZIP, os
+limites usam o tamanho realmente extraído; na ISO, os tamanhos são conferidos
+com os limites da imagem antes da extração. Os limites adicionais do parser e
+o estado dos testes estão em [Importação de ISO](docs/iso-import.md).
 
 O [relatório de análise](docs/xex-analysis.md) registra os resultados e os
 pontos ainda não verificados. Compilação, assinatura e inspeção de bibliotecas
