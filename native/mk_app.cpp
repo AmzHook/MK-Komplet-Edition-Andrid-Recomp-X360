@@ -26,7 +26,7 @@ void MkAndroidApp::OnLoadXexImage(std::string& image) {
 }
 
 void MkAndroidApp::OnPostInitLogging() {
-  REXLOG_INFO("MK experimental Android runtime 0.1.4: gameplay has not been validated");
+  REXLOG_INFO("MK experimental Android runtime 0.1.5: gameplay has not been validated");
 }
 
 void MkAndroidApp::OnPostLoadXexImage() {

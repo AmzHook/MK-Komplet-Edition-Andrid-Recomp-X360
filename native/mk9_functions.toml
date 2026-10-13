@@ -32,3 +32,9 @@
 # The free callback explicitly accepts null; its wrapper preserves LR=0x83164BBC.
 0x82FE6298 = { end = 0x82FE62C8 }
 0x82FE62C8 = { end = 0x82FE62EC }
+# PhysX virtual methods in the 42-slot table at 0x822790A8, installed by
+# 0x8312BD88. The observed slot +0x60 loads the pointer at this+0x34; related
+# +0x50/+0x54 leaves load the pointer at this+0x38 and tail-call existing methods.
+0x83128D38 = { end = 0x83128D40 }
+0x83128D40 = { end = 0x83128D48 }
+0x83128D48 = { end = 0x83128D50 }

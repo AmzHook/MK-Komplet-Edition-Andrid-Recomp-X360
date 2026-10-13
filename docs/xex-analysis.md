@@ -9,7 +9,7 @@ estática e a geração de C++ para esse arquivo. A biblioteca nativa de MK foi
 compilada para Android ARM64 e integrada a um APK experimental. Os testes no
 Poco F7 avançaram até a logo e identificaram as chamadas ausentes descritas
 abaixo. Não há confirmação de carregamento completo ou APK jogável; a versão
-0.1.4 ainda não foi executada no aparelho.
+0.1.5 ainda não foi executada no aparelho.
 
 ## Identificação do arquivo correto
 
@@ -65,10 +65,11 @@ Na geração 0.1.2, o arquivo versionado `native/mk9_functions.toml` continha
 foram acrescentados após os testes no Poco F7 descritos abaixo. A correção
 0.1.3 acrescenta o intervalo observado em execução e dois outros comprovados
 na auditoria das tabelas relacionadas, totalizando 16. A correção 0.1.4 adiciona
-dois callbacks de memória comprovados, totalizando 18. Os limites foram
-recuperados por análise estática de fluxo de controle e lacunas da tabela de
-funções. Dois
-intervalos de troca de contexto conservam os registradores do convidado com
+dois callbacks de memória comprovados, totalizando 18. A correção 0.1.5
+acrescenta três entradas comprovadas de uma tabela do PhysX, totalizando 21.
+Os limites foram recuperados por análise estática de fluxo de controle e
+lacunas da tabela de funções. Dois intervalos de troca de contexto conservam
+os registradores do convidado com
 `share_registers = true`. Não foram adicionadas instruções do jogo, funções
 fictícias ou stubs para eliminar erros de validação. Não há XEX, chaves,
 disassembly ou fontes derivadas do jogo neste relatório.
@@ -244,9 +245,44 @@ A geração 0.1.4 concluiu as fases de validação e escrita em aproximadamente
 liberação confirmou o retorno para ponteiro nulo antes de qualquer leitura de
 memória do alocador.
 
-A versão 0.1.4 permanece experimental e precisa de um novo teste no Poco F7.
-Os avisos sobre arquivos e APIs não implementadas continuam sendo limitações
-distintas; o log não comprova que causaram esta chamada não registrada.
+O novo log da versão 0.1.4 superou esses callbacks e encontrou a entrada
+virtual ausente descrita a seguir. Os avisos sobre arquivos e APIs não
+implementadas continuam sendo limitações distintas; o log não comprova que
+causaram esta chamada não registrada.
+
+## Quinto teste no Poco F7 e correção 0.1.5
+
+O log da versão 0.1.4 registrou uma chamada indireta não registrada a
+`0x83128D48`, com LR `0x83126A80`, `R3=0x44A44B70` e `R4=8`. A chamada em
+`0x83126A7C` usa o slot `+0x60` da tabela de métodos do PhysX.
+
+A tabela ocupa o intervalo `0x822790A8`–`0x82279150`, com 42 slots. O método
+`0x8312BD88` escreve sua referência no offset `+0` do objeto em `0x8312BDAC`;
+o método `0x8312C188` reinstala a referência em `0x8312C1B0`. A auditoria
+independente confirmou 39 entradas já registradas e somente três omitidas:
+
+| Entrada | Fim exclusivo | Tamanho | Comportamento |
+| --- | --- | --- | --- |
+| `0x83128D38` | `0x83128D40` | 8 bytes | Lê o ponteiro armazenado em `this+0x38` e transfere para `0x8312F560` |
+| `0x83128D40` | `0x83128D48` | 8 bytes | Lê o ponteiro armazenado em `this+0x38` e transfere para `0x8312F6B0` |
+| `0x83128D48` | `0x83128D50` | 8 bytes | Retorna o ponteiro armazenado em `this+0x34` |
+
+Os três fluxos têm duas instruções alcançáveis e limites fechados. Os destinos
+das duas transferências já estavam registrados. As outras três referências
+ao getter não foram usadas para acrescentar funções sem evidência a esta
+correção. Foram adicionados somente os três intervalos reais, vinculados ao
+mesmo SHA-256, para gerar os corpos e registros originais.
+
+A verificação dos pré-compilados exige esses três símbolos junto aos sete
+anteriores e preserva as exigências dos diagnósticos do SDK. A geração 0.1.5
+concluiu a validação e escrita em aproximadamente 612,3 segundos: 9 arquivos
+escritos, 530 reaproveitados e nenhum removido. Os 21 intervalos manuais foram
+gerados e registrados. A compilação ARM64, assinatura e verificação do conteúdo
+do APK também concluíram.
+
+A execução da versão 0.1.5 no Poco F7 permanece pendente. Essa análise e os
+checks de build não confirmam carregamento completo, partidas, áudio ou
+desempenho após a correção.
 
 ## Reproduzir as etapas locais
 

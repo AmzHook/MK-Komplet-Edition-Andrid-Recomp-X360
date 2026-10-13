@@ -12,7 +12,22 @@ O usuário fornece o XEX e as demais pastas do jogo; o aplicativo não baixa ess
 arquivos. O APK `MK-Importador` continua disponível como variante que apenas
 importa arquivos, sem execução.
 
-## Atualização experimental 0.1.4
+## Atualização experimental 0.1.5
+
+Corrige o método virtual omitido `0x83128D48`, encontrado no log da versão
+0.1.4. Ele retorna o ponteiro armazenado no campo `+0x34` do objeto. A auditoria
+dos 42 slots da tabela de métodos do PhysX identificou outras duas entradas
+omitidas, `0x83128D38` e `0x83128D40`, que leem o ponteiro do campo `+0x38`
+e transferem a execução para métodos já registrados.
+
+Os três intervalos de 8 bytes foram acrescentados para geração dos corpos
+originais e registros, preservando as sete correções anteriores e os
+diagnósticos do SDK. A geração validada, a compilação ARM64 e as verificações
+de assinatura e conteúdo do APK concluíram. **A versão 0.1.5 ainda não foi
+testada no Poco F7. Carregamento completo e jogabilidade permanecem não
+verificados.**
+
+## Atualização anterior 0.1.4
 
 Corrige dois callbacks de memória do PhysX omitidos na recompilação:
 `0x82FE62C8`, observado no log da versão 0.1.3, e `0x82FE6298`, encontrado
@@ -22,8 +37,8 @@ O callback de liberação já prevê retorno imediato quando recebe um ponteiro
 nulo. O `R3=0` desse log é um argumento válido; a falha ocorreu antes de executar
 essa verificação, porque a função não estava registrada. A correção gera os
 corpos originais e os registros dos dois callbacks, preservando essa lógica.
-**A versão 0.1.4 ainda precisa de teste no Poco F7; carregamento completo e
-jogabilidade permanecem não verificados.**
+O log da versão 0.1.4 superou esses callbacks e encontrou a entrada virtual
+`0x83128D48`, tratada pela correção 0.1.5 acima.
 
 ## Atualização anterior 0.1.3
 
@@ -57,7 +72,7 @@ O teste dessa versão superou a falha anterior e encontrou a entrada ausente
 
 ## Instalação e teste
 
-1. Instale `MK-Experimental-0.1.4.apk` em Android 9 ou mais recente, ARM64 e Vulkan.
+1. Instale `MK-Experimental-0.1.5.apk` em Android 9 ou mais recente, ARM64 e Vulkan.
 2. Toque em **Importar ZIP**. Selecione um ZIP contendo exatamente um
    `default.xex` e todas as demais pastas da sua cópia extraída do jogo. Uma pasta
    externa envolvendo esses arquivos é aceita. Uma ISO precisa ser extraída
@@ -89,7 +104,7 @@ pasta temporária e falhas ou cancelamento preservam a cópia anterior.
 Abra [Actions](https://github.com/AmzHook/MK-Komplet-Edition-Andrid-Recomp-X360/actions).
 O workflow **Package MK Experimental APK** compila o aplicativo Java, verifica
 as bibliotecas ARM64 previamente compiladas e empacota o APK experimental.
-Baixe o artefato `MK-Experimental-0.1.4` de uma execução concluída com sucesso.
+Baixe o artefato `MK-Experimental-0.1.5` de uma execução concluída com sucesso.
 O workflow **Build MK Importador APK** produz a variante de importação.
 O workflow experimental está habilitado para testes no aparelho. A publicação
 da variante de importação é opcional e exige a variável de repositório
@@ -101,7 +116,7 @@ artefatos incluem APK e checksum, ficam disponíveis por 30 dias e seu download
 pode exigir login no GitHub. Após extrair, confira:
 
 ```bash
-sha256sum -c MK-Experimental-0.1.4.apk.sha256
+sha256sum -c MK-Experimental-0.1.5.apk.sha256
 ```
 
 A assinatura é de desenvolvimento. Cada runner gera uma chave nova; uma build
@@ -123,7 +138,7 @@ python3 tools/prepare_prebuilt_runtime.py
 bash tools/build_apk.sh --native
 ```
 
-Saída: `out/apk/MK-Experimental-0.1.4.apk`. Para compilar apenas o importador,
+Saída: `out/apk/MK-Experimental-0.1.5.apk`. Para compilar apenas o importador,
 execute `bash tools/build_apk.sh`.
 
 ## Recompilação nativa a partir da sua cópia

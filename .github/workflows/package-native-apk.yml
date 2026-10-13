@@ -40,10 +40,10 @@ jobs:
       - name: Upload experimental APK
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
-          name: MK-Experimental-0.1.4
+          name: MK-Experimental-0.1.5
           path: |
-            out/apk/MK-Experimental-0.1.4.apk
-            out/apk/MK-Experimental-0.1.4.apk.sha256
+            out/apk/MK-Experimental-0.1.5.apk
+            out/apk/MK-Experimental-0.1.5.apk.sha256
             native/prebuilt/notices/SOURCES.txt
           if-no-files-found: error
           retention-days: 30
@@ -61,7 +61,7 @@ jobs:
       - name: Record actual build scope
         run: |
           cat >> "$GITHUB_STEP_SUMMARY" <<'SUMMARY'
-          **MK Experimental 0.1.4** — Android ARM64, Android 9+, Vulkan.
+          **MK Experimental 0.1.5** — Android ARM64, Android 9+, Vulkan.
 
           This job compiles the Java app and packages checksum-verified **precompiled native libraries**. It does not run ReXGlue codegen or compile an XEX on the runner. No XEX, ISO or game asset is included. The game library contains title-specific recompiled code; import the matching XEX and complete game assets locally.
 
