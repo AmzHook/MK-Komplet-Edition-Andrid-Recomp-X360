@@ -1,0 +1,8 @@
+/out/
+/local.properties
+/game/
+*.iso
+*.xex
+*.zip
+*.jks
+__pycache__/
