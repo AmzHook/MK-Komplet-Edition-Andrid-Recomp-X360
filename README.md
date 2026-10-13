@@ -5,6 +5,12 @@ ReXGlue em Android ARM64. O aplicativo importa os arquivos do jogo por ZIP e
 oferece um botão para testar a inicialização do runtime nativo. **Inicialização,
 partidas, gráficos, áudio e desempenho no Poco F7 ainda não foram verificados.**
 
+**Publicação de APK suspensa:** o usuário solicitou receber um APK somente se
+for jogável. Os jobs de APK exigem a variável de repositório
+`MK_DEVICE_PLAYABILITY_VERIFIED=true`, que deve ser habilitada somente após
+evidência real de inicialização e uma partida no aparelho. Compilar este projeto
+não atende a essa condição.
+
 O APK experimental contém código nativo gerado para um executável específico.
 O usuário fornece o XEX e as demais pastas do jogo; o aplicativo não baixa esses
 arquivos. O APK `MK-Importador` continua disponível como variante que apenas
@@ -46,6 +52,8 @@ O workflow **Package MK Experimental APK** compila o aplicativo Java, verifica
 as bibliotecas ARM64 previamente compiladas e empacota o APK experimental.
 Baixe o artefato `MK-Experimental-0.1.0` de uma execução concluída com sucesso.
 O workflow **Build MK Importador APK** produz a variante de importação.
+Ambos estão bloqueados enquanto a condição de jogabilidade acima não for
+verificada; um artefato experimental anterior não comprova jogabilidade.
 
 O job experimental **empacota bibliotecas pré-compiladas**; ele não recompila um
 XEX no runner. XEX, ISO e fontes C++ geradas do jogo ficam fora do Git. Os

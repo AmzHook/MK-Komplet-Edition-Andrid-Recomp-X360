@@ -11,6 +11,9 @@ permissions:
 
 jobs:
   package:
+    # User requests an APK only after real device playability is established.
+    # This repository variable is unset until that evidence exists.
+    if: vars.MK_DEVICE_PLAYABILITY_VERIFIED == 'true'
     name: Package verified precompiled ARM64 runtime
     runs-on: ubuntu-24.04
     timeout-minutes: 20

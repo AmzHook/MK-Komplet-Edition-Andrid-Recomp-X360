@@ -11,6 +11,8 @@ permissions:
 
 jobs:
   build:
+    # Do not publish an importer-only APK under the user's playability condition.
+    if: vars.MK_DEVICE_PLAYABILITY_VERIFIED == 'true'
     name: Compile and test Android importer
     runs-on: ubuntu-24.04
     timeout-minutes: 20
