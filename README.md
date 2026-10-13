@@ -10,9 +10,21 @@ O usuário fornece o XEX e as demais pastas do jogo; o aplicativo não baixa ess
 arquivos. O APK `MK-Importador` continua disponível como variante que apenas
 importa arquivos, sem execução.
 
+## Atualização experimental 0.1.1
+
+Corrige a função virtual omitida `0x829AEB48`, que interrompeu a inicialização
+no primeiro teste enviado do Poco F7. A função é gerada a partir do XEX original,
+com seu limite validado; não foi substituída por uma função fictícia. Chamadas
+não registradas passam a registrar LR, CTR, registradores de argumentos e ID da
+thread para ajudar no próximo diagnóstico.
+
+O teste recebido confirmou a criação da janela Vulkan na Adreno 825 e a entrada
+no código do jogo. A correção desta chamada ainda precisa de outro teste no
+aparelho; não confirma carregamento completo nem uma luta.
+
 ## Instalação e teste
 
-1. Instale `MK-Experimental-0.1.0.apk` em Android 9 ou mais recente, ARM64 e Vulkan.
+1. Instale `MK-Experimental-0.1.1.apk` em Android 9 ou mais recente, ARM64 e Vulkan.
 2. Toque em **Importar ZIP**. Selecione um ZIP contendo exatamente um
    `default.xex` e todas as demais pastas da sua cópia extraída do jogo. Uma pasta
    externa envolvendo esses arquivos é aceita. Uma ISO precisa ser extraída
@@ -44,7 +56,7 @@ pasta temporária e falhas ou cancelamento preservam a cópia anterior.
 Abra [Actions](https://github.com/AmzHook/MK-Komplet-Edition-Andrid-Recomp-X360/actions).
 O workflow **Package MK Experimental APK** compila o aplicativo Java, verifica
 as bibliotecas ARM64 previamente compiladas e empacota o APK experimental.
-Baixe o artefato `MK-Experimental-0.1.0` de uma execução concluída com sucesso.
+Baixe o artefato `MK-Experimental-0.1.1` de uma execução concluída com sucesso.
 O workflow **Build MK Importador APK** produz a variante de importação.
 O workflow experimental está habilitado para testes no aparelho. A publicação
 da variante de importação é opcional e exige a variável de repositório
@@ -56,7 +68,7 @@ artefatos incluem APK e checksum, ficam disponíveis por 30 dias e seu download
 pode exigir login no GitHub. Após extrair, confira:
 
 ```bash
-sha256sum -c MK-Experimental-0.1.0.apk.sha256
+sha256sum -c MK-Experimental-0.1.1.apk.sha256
 ```
 
 A assinatura é de desenvolvimento. Cada runner gera uma chave nova; uma build
@@ -78,7 +90,7 @@ python3 tools/prepare_prebuilt_runtime.py
 bash tools/build_apk.sh --native
 ```
 
-Saída: `out/apk/MK-Experimental-0.1.0.apk`. Para compilar apenas o importador,
+Saída: `out/apk/MK-Experimental-0.1.1.apk`. Para compilar apenas o importador,
 execute `bash tools/build_apk.sh`.
 
 ## Recompilação nativa a partir da sua cópia

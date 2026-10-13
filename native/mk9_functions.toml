@@ -15,3 +15,6 @@
 # Real context-switch leaf and its thunk; preserve live guest registers.
 0x82BDCC80 = { end = 0x82BDD08C, share_registers = true }
 0x82BDC380 = { end = 0x82BDC384, share_registers = true }
+# Virtual-method thunk observed during Poco F7 startup. Its vtable slot
+# 0x82150CA4 references this separate leaf; the previous leaf ends at its entry.
+0x829AEB48 = { end = 0x829AEB54 }

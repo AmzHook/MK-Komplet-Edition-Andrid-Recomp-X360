@@ -58,8 +58,9 @@ nenhuma removida. A geração final levou aproximadamente 489,7 segundos. As
 fontes derivadas permanecem em `out/native/mk-komplete/generated/default`, fora
 do Git. Esse resultado demonstra geração estática concluída, não execução.
 
-O arquivo versionado `native/mk9_functions.toml` contém apenas **11 intervalos
-de funções**, vinculados ao SHA-256 acima. Os limites foram recuperados por
+O arquivo versionado `native/mk9_functions.toml` contém **12 intervalos
+de funções**, vinculados ao SHA-256 acima; o décimo segundo foi acrescentado
+após o teste no Poco F7 descrito abaixo. Os limites foram recuperados por
 análise estática de fluxo de controle e lacunas da tabela de funções. Dois
 intervalos de troca de contexto conservam os registradores do convidado com
 `share_registers = true`. Não foram adicionadas instruções do jogo, funções
@@ -99,6 +100,38 @@ Há duas questões distintas sobre fibers:
 Inicialização, gráficos, áudio, controles, carregamento e uma luta permanecem
 dependentes dos demais arquivos da cópia e da validação no aparelho. Uma geração
 sem erros e bibliotecas do SDK compiladas não confirmam esses comportamentos.
+
+## Primeiro teste no Poco F7 e correção 0.1.1
+
+O log fornecido pelo usuário em 13 de outubro de 2026 mostra a seleção da
+Adreno 825, API de dispositivo Vulkan 1.3.284, criação da swapchain 2772×1280,
+mapeamento da memória convidada e inicialização da tabela de funções e do
+armazenamento de shaders para o Title ID `575207FD`. A execução foi interrompida
+por uma chamada indireta não registrada a `0x829AEB48`. O aviso sobre a ausência
+de `gamecontrollerdb.txt` não é a falha fatal reportada.
+
+`0x829AEB48` é uma função independente de 12 bytes, encerrada em `0x829AEB54`,
+usada pelo slot `0x82150CA4` da tabela de métodos do alocador do jogo. A função
+anterior termina antes dessa entrada. O destino final `0x82AC48D0` já estava
+registrado. A ausência de PDATA e de chamadas diretas explica por que a análise
+anterior não descobriu essa entrada usada por chamada virtual.
+
+A configuração acrescenta somente seu intervalo real. A geração emitiu o
+corpo e o registro dessa função; nenhum stub, alias para função vizinha ou
+tratamento para ignorar o erro foi usado. O patch
+`native/patches/indirect-call-diagnostics.patch` mantém a falha fatal e amplia o
+log com LR, CTR, R1, R3, R4 e ID da thread convidada. LR não é apresentado como
+o endereço exato da instrução em execução.
+
+A geração da versão 0.1.1 concluiu com validação em 642,9 segundos: 6 saídas
+alteradas e 533 reaproveitadas. Foram conferidos o corpo emitido, a declaração,
+o mapeamento e o registro de `0x829AEB48`, além do registro dos 12 intervalos
+manuais. A compilação incremental concluiu a ligação da biblioteca MK para
+ARM64, preservando a otimização das funções do jogo.
+
+O teste comprova progresso da inicialização do runtime no aparelho, mas não o
+carregamento completo do MK. A execução após esta correção permanece pendente
+de um novo teste.
 
 ## Reproduzir as etapas locais
 

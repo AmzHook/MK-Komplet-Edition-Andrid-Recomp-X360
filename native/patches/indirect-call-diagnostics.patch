@@ -1,0 +1,24 @@
+Append existing guest register values to the unresolved-indirect-call fatal log.
+Base: asura-wrath-rexglue-sdk 38b40e7424e5d3ce1afa38dca10e9a84b1aa2317.
+Keeps the original message prefix, trap, flush and abort behavior. No guest
+memory reads, register writes, fallback functions or PPCContext ABI changes.
+LR is a return address; it is not labeled as the current guest instruction PC.
+BSD-3-Clause SDK source notices remain unchanged.
+
+diff --git a/src/system/function_dispatcher.cpp b/src/system/function_dispatcher.cpp
+--- a/src/system/function_dispatcher.cpp
++++ b/src/system/function_dispatcher.cpp
+@@ -35,8 +35,11 @@
+ }  // namespace
+ 
+ static void InvalidFunctionTrap(PPCContext& ctx, uint8_t* /*base*/) {
+-  REX_FATAL("Call to invalid or unregistered function at guest address 0x{:08X}",
+-            ctx.last_indirect_target);
++  REX_FATAL("Call to invalid or unregistered function at guest address 0x{:08X} "
++            "LR=0x{:08X} CTR=0x{:08X} R1=0x{:08X} R3=0x{:08X} R4=0x{:08X} "
++            "guestThreadID=0x{:08X}",
++            ctx.last_indirect_target, static_cast<uint32_t>(ctx.lr), ctx.ctr.u32,
++            ctx.r1.u32, ctx.r3.u32, ctx.r4.u32, ThreadState::GetThreadID());
+ }
+ 
+ PPCFunc* ResolveIndirectFunction(uint32_t guest_address) {

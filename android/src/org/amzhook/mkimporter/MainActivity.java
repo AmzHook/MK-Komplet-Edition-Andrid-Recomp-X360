@@ -91,7 +91,7 @@ public final class MainActivity extends Activity {
         removeButton = button("Remover arquivos importados"); content.addView(removeButton);
         note = text("Os arquivos ficam no armazenamento privado deste aplicativo. Não há envio pela rede. Desinstalar o APK remove a cópia importada.\n\nReserve espaço para o conteúdo extraído; o ZIP original permanece no local escolhido.", 13, muted);
         content.addView(note);
-        TextView footer = text(nativeAvailable ? "VERSÃO 0.1.0  ·  INICIALIZAÇÃO EXPERIMENTAL" : "VERSÃO 0.1.0  ·  IMPORTAÇÃO LOCAL", 12, muted);
+        TextView footer = text(nativeAvailable ? "VERSÃO 0.1.1  ·  INICIALIZAÇÃO EXPERIMENTAL" : "VERSÃO 0.1.0  ·  IMPORTAÇÃO LOCAL", 12, muted);
         footer.setGravity(Gravity.CENTER); content.addView(footer);
         setContentView(scroll);
         importButton.setOnClickListener(view -> pickZip());
@@ -185,7 +185,7 @@ public final class MainActivity extends Activity {
     }
     private void showDetails() {
         if (installed == null) return;
-        String report = "MK Importador 0.1.0\nArquivos: " + installed.files + "\nTamanho: " + installed.bytes
+        String report = (nativeAvailable ? "MK Experimental 0.1.1" : "MK Importador 0.1.0") + "\nArquivos: " + installed.files + "\nTamanho: " + installed.bytes
                 + " bytes\nXEX: " + installed.xexPath + "\nSHA-256: " + installed.sha256
                 + "\n\nCabeçalho XEX2 verificado. Isso não confirma que o executável é do MK ou que é compatível.\nRuntime: "
                 + (nativeAvailable ? "experimental; inicialização não validada em aparelho." : "não integrado nesta build.");

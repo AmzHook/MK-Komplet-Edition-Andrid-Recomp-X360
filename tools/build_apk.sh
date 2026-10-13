@@ -18,12 +18,16 @@ build_dir=out/importer
 manifest=android/AndroidManifest.xml
 min_api=26
 apk_name=MK-Importador-0.1.0.apk
+version_code=1
+version_name=0.1.0
 java_sources=(android/src/org/amzhook/mkimporter/MainActivity.java android/src/org/amzhook/mkimporter/ZipImporter.java)
 if [ "$variant" = --native ]; then
     build_dir=out/experimental
     manifest=android/AndroidManifest-native.xml
     min_api=28
-    apk_name=MK-Experimental-0.1.0.apk
+    apk_name=MK-Experimental-0.1.1.apk
+    version_code=2
+    version_name=0.1.1
     sdk_root="${MK_NATIVE_TOOLS:-/workspace/.tools/mk-native}/rexglue-sdk"
     sdl_java_root="${MK_SDL_JAVA_ROOT:-$repo_root/vendor/sdl3/android/org/libsdl/app}"
     if [ ! -d "$sdl_java_root" ]; then
@@ -44,7 +48,7 @@ mkdir -p "$build_dir/classes" "$build_dir/dex" out/apk
 "$jdk_bin/javac" --release 11 -classpath "$android_jar" -d "$build_dir/classes" "${java_sources[@]}"
 "$jdk_bin/jar" --create --file "$build_dir/classes.jar" -C "$build_dir/classes" .
 "$build_tools/d8" --min-api "$min_api" --lib "$android_jar" --output "$build_dir/dex" "$build_dir/classes.jar"
-"$build_tools/aapt2" link -I "$android_jar" --manifest "$manifest" --version-code 1 --version-name 0.1.0 -o "$build_dir/unsigned.apk"
+"$build_tools/aapt2" link -I "$android_jar" --manifest "$manifest" --version-code "$version_code" --version-name "$version_name" -o "$build_dir/unsigned.apk"
 export MK_APK_BUILD_DIR="$build_dir" MK_APK_VARIANT="$variant"
 python3 - <<'PY'
 import os, zipfile

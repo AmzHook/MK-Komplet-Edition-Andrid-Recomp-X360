@@ -58,9 +58,12 @@ for item in source.rglob('*'):
     'ReXGlue Android runtime source: https://github.com/PauloUbirajara/asura-wrath-rexglue-sdk\n'
     'Pinned commit: 38b40e7424e5d3ce1afa38dca10e9a84b1aa2317\n'
     'Submodule sources and commit pins: .gitmodules and gitlinks in that SDK.\n'
-    'Local SDK change: native/patches/android-fiber.patch in this repository.\n'
+    'Local SDK changes: native/patches/android-fiber.patch and indirect-call-diagnostics.patch.\n'
     'Original Android wrapper and build scripts: AmzHook/MK-Komplet-Edition-Andrid-Recomp-X360.\n'
-    'Rebuild with the same XEX locally; game files are not distributed with this project.\n')
+    'No XEX, ISO or game assets are distributed; the APK includes title-specific compiled code.\n'
+    'Exact corresponding public runtime/dependency sources: native/prebuilt/runtime-sources.tar.xz.\n'
+    'Rebuild runtime without game files: python3 tools/bootstrap_native.py; bash tools/build_runtime.sh.\n'
+    'Replace compatible runtime libraries in out/native/jniLibs/arm64-v8a, then build_apk.sh --native.\n')
 for notice in Path(os.environ['MK_NATIVE_NDK_ROOT']).glob('NOTICE*'):
     if notice.is_file(): shutil.copyfile(notice, notices / ('NDK-' + notice.name))
 PY

@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Archive exact public SDK dependency sources and the local Android patch.
+"""Archive exact public SDK dependency sources and the local Android patches.
 
 Uses only Git-tracked SDK/submodule files and the explicit new fiber assembly;
 never includes tool caches, build outputs, generated MK code or game files.
@@ -11,6 +11,8 @@ import os
 from pathlib import Path
 import subprocess
 import tarfile
+
+from bootstrap_native import PATCHES
 
 PIN = '38b40e7424e5d3ce1afa38dca10e9a84b1aa2317'
 REPO = Path(__file__).resolve().parent.parent
@@ -49,17 +51,26 @@ def main():
             path = root / relative
             if path.is_file() or path.is_symlink():
                 name = path.relative_to(sdk).as_posix()
-                if path.suffix.lower() in {'.xex', '.iso', '.so', '.o', '.a'} or any(p in {'.git', 'out', 'generated'} for p in Path(name).parts):
+                # These bundled Windows CLI tools are not inputs to the
+                # Android runtime build. Corresponding runtime sources and
+                # their pinned submodules remain in the archive.
+                if name.startswith('tools/binutils/'):
+                    continue
+                if path.suffix.lower() in {'.exe', '.dll', '.lib', '.so', '.o', '.a'}:
+                    continue
+                if path.suffix.lower() in {'.xex', '.iso'} or any(p in {'.git', 'out', 'generated'} for p in Path(name).parts):
                     parser.error('Unexpected build/game file in tracked SDK source: ' + name)
                 files[name] = path
     assembly = sdk / 'src/core/fiber_android_aarch64.S'
     if not assembly.is_file():
         parser.error('Required patched Android fiber assembly is missing.')
     files[assembly.relative_to(sdk).as_posix()] = assembly
-    patch = REPO / 'native/patches/android-fiber.patch'
-    if subprocess.run(['git', '-C', str(sdk), 'apply', '--reverse', '--check', str(patch)], capture_output=True).returncode:
-        parser.error('Required Android patch is not applied to these sources.')
-    files['local-patches/android-fiber.patch'] = patch
+    for patch in PATCHES:
+        if not patch.is_file():
+            parser.error('Required runtime source patch is missing: ' + patch.name)
+        if subprocess.run(['git', '-C', str(sdk), 'apply', '--reverse', '--check', str(patch)], capture_output=True).returncode:
+            parser.error('Required runtime patch is not applied to these sources: ' + patch.name)
+        files['local-patches/' + patch.name] = patch
     args.output.parent.mkdir(parents=True, exist_ok=True)
     temporary = args.output.with_suffix('.partial')
     with tarfile.open(temporary, 'w:xz', preset=3) as archive:
