@@ -54,3 +54,52 @@
 # handlers were absent (opcodes 0x60/0x61); preserve their real dispatch.
 0x8270A588 = { end = 0x8270A5B0 }
 0x8270A5B0 = { end = 0x8270A5DC }
+# Virtual method reached through the +0x44 slots in 0x82020C00 and
+# 0x8202A9E0. Preserve the original null guard for the pointer at this+0x68
+# and the tail branch to registered 0x82A98820; 0x8243FB40 remains separate.
+0x8243FB30 = { end = 0x8243FB40 }
+# Proven register-shuffling thunks in the image-initialized table 0x822608E8
+# and this-adjustment thunks in installed tables beginning at 0x82291D68.
+# All tail targets are registered. Keep every original ordered move,
+# including the R11 temporary in 0x82FE69D0; no aliases or replacement bodies.
+0x82FE66D0 = { end = 0x82FE66DC }
+0x82FE6730 = { end = 0x82FE673C }
+0x82FE6760 = { end = 0x82FE676C }
+0x82FE6788 = { end = 0x82FE6790 }
+0x82FE6790 = { end = 0x82FE6798 }
+0x82FE6798 = { end = 0x82FE67A8 }
+0x82FE67A8 = { end = 0x82FE67B8 }
+0x82FE67B8 = { end = 0x82FE67C8 }
+0x82FE67C8 = { end = 0x82FE67D8 }
+0x82FE67D8 = { end = 0x82FE67E8 }
+0x82FE67E8 = { end = 0x82FE67F8 }
+0x82FE67F8 = { end = 0x82FE6808 }
+0x82FE6808 = { end = 0x82FE6818 }
+0x82FE6818 = { end = 0x82FE682C }
+0x82FE6858 = { end = 0x82FE6860 }
+0x82FE6860 = { end = 0x82FE6868 }
+0x82FE6868 = { end = 0x82FE6870 }
+0x82FE6870 = { end = 0x82FE6874 }
+0x82FE6898 = { end = 0x82FE68A4 }
+0x82FE68E8 = { end = 0x82FE6900 }
+0x82FE6900 = { end = 0x82FE6920 }
+0x82FE6938 = { end = 0x82FE694C }
+0x82FE6968 = { end = 0x82FE6980 }
+0x82FE6980 = { end = 0x82FE6998 }
+0x82FE6998 = { end = 0x82FE69B4 }
+0x82FE69D0 = { end = 0x82FE69E8 }
+0x82FE69E8 = { end = 0x82FE69FC }
+0x82FE6A98 = { end = 0x82FE6AB0 }
+0x832B30D8 = { end = 0x832B30E0 }
+0x832B30E8 = { end = 0x832B30F0 }
+0x832B30F0 = { end = 0x832B30F8 }
+0x832B30F8 = { end = 0x832B3100 }
+0x832B3100 = { end = 0x832B3108 }
+0x832B9368 = { end = 0x832B9370 }
+0x832B9380 = { end = 0x832B9388 }
+0x832B9610 = { end = 0x832B9618 }
+0x832B9628 = { end = 0x832B9630 }
+0x832B9630 = { end = 0x832B9638 }
+0x832B9638 = { end = 0x832B9640 }
+0x832B9640 = { end = 0x832B9648 }
+0x832B9648 = { end = 0x832B9650 }

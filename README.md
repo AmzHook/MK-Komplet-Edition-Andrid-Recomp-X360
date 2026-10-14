@@ -12,7 +12,53 @@ O usuário fornece a ISO ou um ZIP com o XEX e as demais pastas do jogo; o
 aplicativo não baixa esses arquivos. O APK `MK-Importador` continua disponível
 como variante que apenas importa arquivos, sem execução.
 
-## Atualização experimental 0.1.8
+## Atualização experimental 0.1.9
+
+Corrige a entrada virtual omitida `0x8243FB30`, encontrada no log real da versão
+0.1.8 com LR `0x82408F90`. O corpo original de 16 bytes,
+`0x8243FB30`–`0x8243FB40` com fim exclusivo, carrega o ponteiro armazenado em
+`this+0x68`, retorna se ele for nulo e, caso contrário, transfere a execução
+para `0x82A98820`, já registrado. O wrapper `0x8243FB20` usa o slot virtual
+`+0x44` e preserva o LR do chamador.
+
+A auditoria das tabelas `0x82020C00` e `0x8202A9E0`, com 23 slots cada,
+e das tabelas relacionadas `0x82000978`, com 3, e `0x820292A8`, com 2,
+encontrou somente essa função ausente. A correção também incorpora 41 thunks
+originais comprovados em uma revisão mais ampla de entradas indiretas:
+
+- 28 thunks reordenam argumentos e transferem a execução para destinos já
+  registrados. Pertencem à tabela de base `0x822608E8`, cuja extensão de 76
+  slots é inferida até a próxima base comprovada, `0x82260A18`.
+- 13 thunks ajustam `this` em −4 e transferem a execução para destinos já
+  registrados. Estão distribuídos pelas bases `0x82291D68`, `0x82291DD8`,
+  `0x82291E54`, `0x82291E80`, `0x82291EF0`, `0x82291F6C` e `0x82291F98`.
+  A região contínua de 171 ponteiros contém várias tabelas adjacentes.
+
+Os corpos preservam a ordem original dos movimentos de registradores,
+incluindo o temporário `R11` em `0x82FE69D0`, e os saltos finais sem alteração
+do LR. Os limites foram conferidos com o código original e os destinos
+registrados, sem sobreposição com os intervalos anteriores.
+
+São 42 adições nesta versão, elevando o total de limites manuais de 28 para
+70. Os intervalos completos estão em
+[mk9_functions.toml](native/mk9_functions.toml). O verificador das bibliotecas
+pré-compiladas agora exige os símbolos de todos os intervalos desse arquivo.
+O suporte a ZIP e ISO e os diagnósticos do runtime são preservados.
+
+Geração completa com validação concluída em 572,7 segundos: 88 arquivos escritos,
+451 preservados e nenhum removido. Os 70 intervalos possuem corpos e registros,
+com 98.629 registros no total e todos os 98.587 anteriores preservados. Uma
+revisão independente confirmou os 42 novos corpos, incluindo os 87 movimentos
+de registradores na ordem original. A compilação ARM64 e os 29 testes Python
+passaram. O verificador rejeitou a biblioteca antiga pelos 42 corpos ausentes
+e aprovou os 70 símbolos exigidos na biblioteca nova.
+As verificações de assinatura e conteúdo do APK passaram, com 4 bibliotecas
+ARM64 e 47 avisos de licença e fontes correspondentes.
+
+**A versão 0.1.9 ainda precisa de teste no Poco F7. Carregamento completo e
+jogabilidade continuam sem validação.**
+
+## Atualização anterior 0.1.8
 
 Corrige o adaptador de despacho da VM de scripts `0x8270A5B0`, encontrado no
 log real da versão 0.1.7 com LR `0x8271CEBC`. Ele lê o ponteiro de bytecode
@@ -45,9 +91,9 @@ com 98.587 registros no total e os 16 adaptadores de banco registrados. Todos os
 Python e as verificações de assinatura e conteúdo do APK passaram. O pacote
 contém 4 bibliotecas ARM64 e 47 avisos de licença e fontes correspondentes.
 
-**A versão 0.1.8 ainda precisa de teste no Poco F7; carregamento completo e
-jogabilidade continuam sem validação.** O próximo opcode e o destino escolhido pelo
-adaptador não aparecem neste fatal e ainda precisam de teste no aparelho.
+O novo log real da versão 0.1.8 registrou a entrada ausente `0x8243FB30`,
+tratada pela correção 0.1.9 acima. **Carregamento completo e jogabilidade
+continuam sem validação.**
 
 ## Atualização anterior 0.1.7
 
@@ -168,7 +214,7 @@ O teste dessa versão superou a falha anterior e encontrou a entrada ausente
 
 ## Instalação e teste
 
-1. Instale `MK-Experimental-0.1.8.apk` em Android 9 ou mais recente, ARM64 e Vulkan.
+1. Instale `MK-Experimental-0.1.9.apk` em Android 9 ou mais recente, ARM64 e Vulkan.
 2. Toque em **Importar ZIP ou ISO**. Selecione a ISO Xbox 360 da sua cópia do
    jogo ou um ZIP contendo exatamente um `default.xex` e todas as demais pastas
    do jogo. No ZIP, uma pasta externa envolvendo esses arquivos é aceita.
@@ -212,7 +258,7 @@ comprimidas, pacotes GOD e ISOs divididas em partes não são aceitos.
 Abra [Actions](https://github.com/AmzHook/MK-Komplet-Edition-Andrid-Recomp-X360/actions).
 O workflow **Package MK Experimental APK** compila o aplicativo Java, verifica
 as bibliotecas ARM64 previamente compiladas e empacota o APK experimental.
-Baixe o artefato `MK-Experimental-0.1.8` de uma execução concluída com sucesso.
+Baixe o artefato `MK-Experimental-0.1.9` de uma execução concluída com sucesso.
 O workflow **Build MK Importador APK** produz a variante de importação.
 O workflow experimental está habilitado para testes no aparelho. A publicação
 da variante de importação é opcional e exige a variável de repositório
@@ -224,7 +270,7 @@ artefatos incluem APK e checksum, ficam disponíveis por 30 dias e seu download
 pode exigir login no GitHub. Após extrair, confira:
 
 ```bash
-sha256sum -c MK-Experimental-0.1.8.apk.sha256
+sha256sum -c MK-Experimental-0.1.9.apk.sha256
 ```
 
 A assinatura é de desenvolvimento. Cada runner gera uma chave nova; uma build
@@ -246,7 +292,7 @@ python3 tools/prepare_prebuilt_runtime.py
 bash tools/build_apk.sh --native
 ```
 
-Saída: `out/apk/MK-Experimental-0.1.8.apk`. Para compilar apenas o importador,
+Saída: `out/apk/MK-Experimental-0.1.9.apk`. Para compilar apenas o importador,
 execute `bash tools/build_apk.sh`.
 
 ## Recompilação nativa a partir da sua cópia
