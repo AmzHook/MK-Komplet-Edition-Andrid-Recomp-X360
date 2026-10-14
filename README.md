@@ -55,8 +55,12 @@ e aprovou os 70 símbolos exigidos na biblioteca nova.
 As verificações de assinatura e conteúdo do APK passaram, com 4 bibliotecas
 ARM64 e 47 avisos de licença e fontes correspondentes.
 
-**A versão 0.1.9 ainda precisa de teste no Poco F7. Carregamento completo e
-jogabilidade continuam sem validação.**
+O usuário confirmou que a versão 0.1.9 ainda fecha na logo no Poco F7. O log
+dessa tentativa ainda não foi fornecido; não há confirmação de que chegou à
+seleção de perfil. **Carregamento completo e jogabilidade continuam sem
+validação.** A [comparação com os outros ports](docs/reference-runtime-review.md)
+confirma que o runtime já oferece um perfil local conectado e dispensa o
+diálogo de login do Xbox; isso não resolve as falhas anteriores de despacho.
 
 ## Atualização anterior 0.1.8
 
