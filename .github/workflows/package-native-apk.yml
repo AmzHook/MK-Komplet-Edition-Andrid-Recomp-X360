@@ -27,6 +27,7 @@ jobs:
         run: |
           python3 -m unittest discover -s tests -p 'test_*.py' -v
           bash tools/test_importer.sh
+          bash tools/test_native_diagnostics.sh
 
       - name: Verify checksums, ARM64 ELF and source notices
         run: python3 tools/prepare_prebuilt_runtime.py
@@ -40,10 +41,10 @@ jobs:
       - name: Upload experimental APK
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
-          name: MK-Experimental-0.1.9
+          name: MK-Experimental-0.1.10
           path: |
-            out/apk/MK-Experimental-0.1.9.apk
-            out/apk/MK-Experimental-0.1.9.apk.sha256
+            out/apk/MK-Experimental-0.1.10.apk
+            out/apk/MK-Experimental-0.1.10.apk.sha256
             native/prebuilt/notices/SOURCES.txt
           if-no-files-found: error
           retention-days: 30
@@ -61,9 +62,11 @@ jobs:
       - name: Record actual build scope
         run: |
           cat >> "$GITHUB_STEP_SUMMARY" <<'SUMMARY'
-          **MK Experimental 0.1.9** — Android ARM64, Android 9+, Vulkan.
+          **MK Experimental 0.1.10** — Android ARM64, Android 9+, Vulkan.
 
           This job compiles the Java app and packages checksum-verified **precompiled native libraries**. It does not run ReXGlue codegen or compile an XEX on the runner. No XEX, ISO or game asset is included. The game library contains title-specific recompiled code; import the matching XEX and complete game assets locally.
+
+          Version 0.1.10 adds 20 verified original function bodies (90 manual intervals total), backports Android SDL/POSIX idle-wait fixes from Shiftglue, and records bounded startup/movie file-open attempts. CPU-wait checks ran on a Linux host; Poco F7 temperature, boot and gameplay still require a device test.
 
           Use **Importar ZIP ou ISO** to extract an Xbox 360 XDVDFS image (XISO, XGD2 or XGD3, 2048-byte sectors) or import an extracted ZIP. Some document providers require a temporary ISO copy; reserve space for it and the extracted game. ISO support is verified with synthetic images, not a real MK disc or an Android document provider.
 

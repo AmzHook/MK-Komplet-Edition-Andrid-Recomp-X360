@@ -61,10 +61,11 @@ def main():
                 if path.suffix.lower() in {'.xex', '.iso'} or any(p in {'.git', 'out', 'generated'} for p in Path(name).parts):
                     parser.error('Unexpected build/game file in tracked SDK source: ' + name)
                 files[name] = path
-    assembly = sdk / 'src/core/fiber_android_aarch64.S'
-    if not assembly.is_file():
-        parser.error('Required patched Android fiber assembly is missing.')
-    files[assembly.relative_to(sdk).as_posix()] = assembly
+    for name in ['src/core/fiber_android_aarch64.S', 'include/rex/kernel/xboxkrnl/io.h']:
+        added = sdk / name
+        if not added.is_file():
+            parser.error('Required patched runtime source is missing: ' + name)
+        files[name] = added
     for patch in PATCHES:
         if not patch.is_file():
             parser.error('Required runtime source patch is missing: ' + patch.name)

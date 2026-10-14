@@ -17,6 +17,7 @@ class MkAndroidApp final : public rex::ReXApp {
   void OnLoadXexImage(std::string& image) override;
   void OnPostInitLogging() override;
   void OnPostLoadXexImage() override;
+  void OnShutdown() override;
 
  private:
   explicit MkAndroidApp(rex::ui::WindowedAppContext& context);

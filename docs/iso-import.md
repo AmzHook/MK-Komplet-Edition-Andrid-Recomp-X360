@@ -1,4 +1,4 @@
-# Importação de ISO Xbox 360 · APK 0.1.9
+# Importação de ISO Xbox 360 · APK 0.1.10
 
 Desde a versão 0.1.6, o APK aceita uma ISO Xbox 360 pelo botão **Importar ZIP ou
 ISO**. Ele extrai os arquivos da partição do jogo para o armazenamento privado
@@ -9,12 +9,12 @@ O recurso foi validado com imagens sintéticas. Nenhuma ISO real de Mortal
 Kombat Komplete Edition foi fornecida para este teste. A importação dessa cópia
 e o comportamento dos provedores de arquivos no Poco F7 ainda precisam ser
 verificados. Carregamento completo, partidas, áudio e desempenho do runtime
-continuam sem validação. A versão 0.1.9 preserva esse importador e contém 70
+continuam sem validação. A versão 0.1.10 preserva esse importador e contém 90
 intervalos de funções nativas comprovados; consulte o histórico no README.
 
 ## Como importar
 
-1. Instale `MK-Experimental-0.1.9.apk` e abra o aplicativo.
+1. Instale `MK-Experimental-0.1.10.apk` e abra o aplicativo.
 2. Toque em **Importar ZIP ou ISO** e selecione a ISO da sua cópia Xbox 360.
 3. Mantenha o aplicativo aberto durante a preparação e a extração. O botão
    **Cancelar importação** interrompe a operação; uma tentativa que falha ou é

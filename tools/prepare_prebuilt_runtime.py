@@ -79,6 +79,12 @@ def verify(source):
             raise ValueError('Runtime lacks the 0.1.1 indirect-call diagnostics.')
         if name == 'librexruntime.so' and b'UNIMPLEMENTED calls=' not in path.read_bytes():
             raise ValueError('Runtime lacks the 0.1.2 bounded floating-point stub diagnostics.')
+        if name == 'librexruntime.so' and 'SetGuestFileOpenObserver' not in details:
+            raise ValueError('Runtime lacks the 0.1.10 file-open observer API.')
+        if name == 'librexruntime.so' and b'SDL Android poll sentinel disabled for blocking waits' not in path.read_bytes():
+            raise ValueError('Runtime lacks the 0.1.10 Android SDL idle-wait correction.')
+        if name == 'libmk_komplete.so' and b'MK file request: kind=' not in path.read_bytes():
+            raise ValueError('Game wrapper lacks bounded startup/movie file diagnostics.')
         print(f'Verified {name}: ARM64, 16 KiB LOAD alignment, packaged dependencies')
 
 

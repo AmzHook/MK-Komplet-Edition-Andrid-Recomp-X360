@@ -103,3 +103,33 @@
 0x832B9638 = { end = 0x832B9640 }
 0x832B9640 = { end = 0x832B9648 }
 0x832B9648 = { end = 0x832B9650 }
+# Movie-command secondary table 0x82160E30, installed by 0x829D0CB0.
+# Original 20-byte forwarding leaf; keep its dynamic virtual tail transfer.
+# The zero padding at 0x82B4CBDC is not part of the function.
+0x82B4CBC8 = { end = 0x82B4CBDC }
+# Four original this-4 tail thunks on separate installed secondary tables
+# 0x822920B0 and 0x82292120; their direct tail targets are registered.
+0x832B9370 = { end = 0x832B9378 }
+0x832B9600 = { end = 0x832B9608 }
+0x832B9618 = { end = 0x832B9620 }
+0x832B9620 = { end = 0x832B9628 }
+# Installed secondary table 0x82229C18, stored by 0x82E9F260 at object+0x10.
+# Each 24-byte original body obtains its delegate and preserves virtual dispatch.
+0x82E9F350 = { end = 0x82E9F368 }
+0x82E9F368 = { end = 0x82E9F380 }
+0x82E9F380 = { end = 0x82E9F398 }
+0x82E9F398 = { end = 0x82E9F3B0 }
+0x82E9F3B0 = { end = 0x82E9F3C8 }
+0x82E9F3C8 = { end = 0x82E9F3E0 }
+0x82E9F3E0 = { end = 0x82E9F3F8 }
+0x82E9F3F8 = { end = 0x82E9F410 }
+# Seven original D3D forwarding leaves on concretely installed tables
+# 0x821B43A0, 0x821B4628 and 0x821BB978, each 162 slots. Preserve original
+# constant arguments and the ordered argument moves in 0x82C5BA18.
+0x82C5B200 = { end = 0x82C5B210 }
+0x82C5B588 = { end = 0x82C5B5B0 }
+0x82C5B5B0 = { end = 0x82C5B5D8 }
+0x82C5B5D8 = { end = 0x82C5B600 }
+0x82C5B600 = { end = 0x82C5B628 }
+0x82C5BA18 = { end = 0x82C5BA38 }
+0x82C5BA38 = { end = 0x82C5BA3C }

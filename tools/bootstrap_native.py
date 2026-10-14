@@ -29,7 +29,8 @@ SUBMODULES = ("cli11", "libmspack", "FFmpeg", "tomlplusplus", "simde",
               "spirv-tools", "glslang", "o1heap", "inja")
 PATCHES = tuple(Path(__file__).resolve().parent.parent / "native/patches" / name
                 for name in ("android-fiber.patch", "indirect-call-diagnostics.patch",
-                             "floating-point-stub-logging.patch"))
+                             "floating-point-stub-logging.patch", "file-open-observer.patch",
+                             "android-idle-waits.patch"))
 
 
 def digest_file(path, algorithm):

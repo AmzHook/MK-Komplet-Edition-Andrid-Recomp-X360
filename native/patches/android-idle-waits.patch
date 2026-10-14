@@ -1,0 +1,40 @@
+diff --git a/src/core/threading_posix.cpp b/src/core/threading_posix.cpp
+index 90b88a9..25f772f 100644
+--- a/src/core/threading_posix.cpp
++++ b/src/core/threading_posix.cpp
+@@ -426,9 +426,13 @@ class PosixConditionBase {
+       if (timeout == std::chrono::milliseconds::max()) {
+         std::this_thread::sleep_for(std::chrono::milliseconds(1));
+       } else {
+-        auto remaining = std::chrono::duration_cast<std::chrono::milliseconds>(end_time - now);
+-        auto sleep_time = std::min(remaining, std::chrono::milliseconds(1));
+-        std::this_thread::sleep_for(sleep_time);
++        // Preserve sub-millisecond precision (Shiftglue SDK 0d85db45,
++        // arcanite24, BSD 3-Clause).
++        // Alertable waits use 1 ms slices; rounding their remaining time down
++        // to whole milliseconds turns most of each slice into a busy wait.
++        auto remaining = end_time - now;
++        std::this_thread::sleep_for(std::min<std::chrono::steady_clock::duration>(
++            remaining, std::chrono::milliseconds(1)));
+       }
+     }
+   }
+diff --git a/src/ui/windowed_app_context_sdl.cpp b/src/ui/windowed_app_context_sdl.cpp
+index dc0b4c2..4b6e61c 100644
+--- a/src/ui/windowed_app_context_sdl.cpp
++++ b/src/ui/windowed_app_context_sdl.cpp
+@@ -56,6 +56,14 @@ bool SDLWindowedAppContext::Initialize() {
+   }
+   const char* video_driver_in_use = SDL_GetCurrentVideoDriver();
+   REXLOG_INFO("SDL video driver: {}", video_driver_in_use ? video_driver_in_use : "unknown");
++#if REX_PLATFORM_ANDROID
++  // Adapted from Shiftglue SDK 26824c61 (arcanite24, BSD 3-Clause). This loop waits for
++  // events rather than polling in cycles. Android's SDL_WaitEvent pumps a
++  // sentinel which posts a wake to its own waiting thread on every pass;
++  // disabling the unused sentinel lets the empty queue actually block.
++  SDL_SetEventEnabled(SDL_EVENT_POLL_SENTINEL, false);
++  REXLOG_INFO("SDL Android poll sentinel disabled for blocking waits");
++#endif
+   uint32_t first = SDL_RegisterEvents(2);
+   if (first == 0) {
+     REXLOG_ERROR("SDL_RegisterEvents failed: {}", SDL_GetError());

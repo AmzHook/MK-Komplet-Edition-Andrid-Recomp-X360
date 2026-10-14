@@ -86,9 +86,10 @@ de terminar a reprodução.
 
 Uma ferramenta de diagnóstico que pode ser adaptada é
 [`GuestFileOpenObserver`](https://github.com/deivid22srk/shiftglue-sdk/blob/2db68133de6ec609c275fd8707316a240dd980e5/include/rex/kernel/xboxkrnl/io.h#L7)
-do Shiftglue: permite observar os nomes de arquivos abertos pelo jogo, inclusive
-vídeos. Esse observador ainda não foi incorporado ao MK. Ele ajudaria a traçar
-a inicialização; não implementa os corpos de funções ausentes.
+do Shiftglue: permite observar os nomes de arquivos solicitados pelo jogo,
+inclusive vídeos. Esse observador não estava incorporado na 0.1.9; a 0.1.10
+adapta sua API genérica e limita o log. Ele traça tentativas de abertura, sem
+implementar os corpos de funções ausentes ou confirmar o sucesso da leitura.
 
 O NFS III permite interromper seu próprio loop de reprodução de filmes, mas
 seu código é da versão PC e a licença declara "ALL RIGHTS RESERVED — NO LICENSE
@@ -102,7 +103,55 @@ verificados, mas o relato de fechamento não identifica a função ou o erro
 seguinte. A última linha `[FATAL]` da 0.1.9, com endereço e LR, permite conferir
 o destino no executável e implementar uma correção fundamentada.
 
-Esta revisão não altera o runtime e não estabelece jogabilidade. As mudanças
+Esta revisão inicial não alterou o runtime e não estabeleceu jogabilidade. As mudanças
 de código de um título de referência precisam ser avaliadas contra os caminhos
 reais do MK; copiar seus endereços ou substituir funções por retornos de
 sucesso não demonstra que o jogo funcionará.
+
+## Pesquisa e implementação da 0.1.10
+
+O link [Reddit fornecido pelo usuário](https://www.reddit.com/r/AndroidNativePorts/s/waCXd9Mmk4)
+foi bloqueado pela política de rede do ambiente. O usuário colou um trecho dos
+comentários sobre SDL e áudio consumirem CPU enquanto esperavam sem trabalho.
+A análise usa esse trecho; não atribui autoria nem afirma ter lido o restante
+do post. A pesquisa no GitHub identificou implementações aplicáveis:
+
+- [Shiftglue 26824c6](https://github.com/deivid22srk/shiftglue-sdk/commit/26824c612a829c6ef7dc3baa507a4e1ce4a52222):
+  `SDL_EVENT_POLL_SENTINEL` acordava continuamente a própria fila no Android.
+  O contexto do MK também usa `SDL_WaitEvent` e o mesmo SDL fixado em
+  `8bf3b7215ad9fc3deb583c6a3a37c6c67f2e24e4`. Desativar somente esse evento
+  interno preserva os eventos reais e os wakeups explícitos do aplicativo.
+- [Shiftglue 0d85db4](https://github.com/deivid22srk/shiftglue-sdk/commit/0d85db454648df3838265d1b53b803df7a1af4b6):
+  `WaitMultiple` arredondava o tempo restante para milissegundos inteiros,
+  causando `sleep_for(0)` quando restava menos de 1 ms. O áudio do MK usa
+  `WaitAny` alertável, cujas fatias de espera são justamente de 1 ms.
+  A adaptação conserva o restante preciso e o limite de pausa de 1 ms.
+
+Os dois commits são de 1º de outubro de 2026, por Brandon G. Neri (`arcanite24`).
+Foram adaptados somente os trechos genéricos em
+`native/patches/android-idle-waits.patch`, mantendo os avisos BSD. Esses ajustes
+de trabalho ocioso de CPU não corrigem por si só chamadas PowerPC ausentes.
+Não usamos limites de FPS ou hooks do renderer específico de reBlue.
+
+Para essas chamadas, a [issue oficial ReXGlue #363](https://github.com/rexglue/rexglue-sdk/issues/363)
+mostra a mesma sequência de compilação bem-sucedida seguida por erros em
+pequenos thunks. A [documentação de chamadas não resolvidas](https://github.com/rexglue/rexglue-sdk/wiki/Generated-Code-Structure#unresolved-calls)
+orienta informar endereço e tamanho exatos de funções reais. A
+[issue #117](https://github.com/rexglue/rexglue-sdk/issues/117) confirma que essa
+etapa manual é esperada. A [issue #359](https://github.com/rexglue/rexglue-sdk/issues/359)
+também mostra por que o erro isolado não basta: destinos podem ser labels de
+uma tabela de saltos, que não devem virar novas funções.
+
+Os seis arquivos de descoberta/emissão examinados no HEAD oficial
+`c94f5ebdcb3c9d1a460ca48e04f9758448f8d518` eram idênticos aos do SDK usado pelo
+MK. Não havia nesses arquivos uma correção nova que justificasse atualizar
+todo o SDK. A auditoria do próprio executável recuperou outros 20 corpos
+originais em tabelas realmente instaladas, incluindo o proxy `0x82B4CBC8`
+associado aos comandos de vídeo. Uma revisão independente conferiu seus
+limites e a ordem dos argumentos. Os intervalos constam em
+[mk9_functions.toml](../native/mk9_functions.toml); nenhum desses novos
+endereços foi observado em um fatal do aparelho até esta revisão.
+
+A 0.1.10 incorpora essas três mudanças: esperas corrigidas, corpos originais
+recuperados e observação limitada de arquivos. A execução física, a temperatura
+e a jogabilidade no Poco F7 permanecem sem validação.

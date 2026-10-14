@@ -12,7 +12,71 @@ O usuário fornece a ISO ou um ZIP com o XEX e as demais pastas do jogo; o
 aplicativo não baixa esses arquivos. O APK `MK-Importador` continua disponível
 como variante que apenas importa arquivos, sem execução.
 
-## Atualização experimental 0.1.9
+## Atualização experimental 0.1.10
+
+A pesquisa no GitHub identificou duas correções do Shiftglue que correspondem
+ao trecho do Reddit fornecido pelo usuário. Foram adaptadas no patch
+[android-idle-waits.patch](native/patches/android-idle-waits.patch):
+
+- [SDL, commit 26824c6](https://github.com/deivid22srk/shiftglue-sdk/commit/26824c612a829c6ef7dc3baa507a4e1ce4a52222):
+  desativa o evento interno `SDL_EVENT_POLL_SENTINEL` no Android. O contexto usa
+  `SDL_WaitEvent`; esse sentinel acordava a própria fila sem eventos reais.
+  Eventos de controle, janela, pintura e encerramento continuam habilitados.
+- [Espera POSIX, commit 0d85db4](https://github.com/deivid22srk/shiftglue-sdk/commit/0d85db454648df3838265d1b53b803df7a1af4b6):
+  preserva o restante inferior a 1 ms antes de dormir. Antes, o arredondamento
+  para milissegundos inteiros transformava essas pausas em `sleep_for(0)`;
+  as esperas alertáveis do worker de áudio usam fatias de 1 ms.
+
+Essas correções tratam trabalho ocioso de CPU. A temperatura, o uso de CPU e o
+áudio do MK no Poco F7 ainda precisam ser medidos. O perfil offline continua
+disponível; as mudanças de espera não representam uma correção de login.
+
+A auditoria sistemática recuperou **20 corpos originais ausentes**, elevando
+os intervalos manuais de 70 para 90 em
+[mk9_functions.toml](native/mk9_functions.toml):
+
+| Família | Adições | Evidência |
+| --- | --- | --- |
+| Proxy associado aos comandos de vídeo | 1 | `0x82B4CBC8`–`0x82B4CBDC`, 20 bytes, tabela secundária `0x82160E30` instalada por `0x829D0CB0`. |
+| Thunks PhysX de ajuste de receptor | 4 | Corpos de 8 bytes em duas tabelas secundárias instaladas, `0x822920B0` e `0x82292120`. |
+| Encaminhadores de interface | 8 | Corpos de 24 bytes na tabela `0x82229C18`, instalada por `0x82E9F260`. |
+| Encaminhadores D3D | 7 | Tabelas realmente instaladas `0x821B43A0`, `0x821B4628` e `0x821BB978`, cada uma com 162 slots. |
+
+Uma revisão independente conferiu os limites e as instruções originais,
+incluindo a ordem dos argumentos, os saltos finais e a preservação do LR.
+Nenhum novo intervalo se sobrepõe a PDATA, aos 70 anteriores ou a registros
+interiores. A varredura de 4.217.369 instruções não encontrou saltos diretos
+para o interior desses corpos. A orientação oficial e as fontes consultadas
+estão na [revisão dos runtimes](docs/reference-runtime-review.md).
+
+O [observador genérico de arquivos](native/patches/file-open-observer.patch)
+do Shiftglue também foi adaptado. O log mostra `MK file request` com os nomes
+completos das primeiras 128 tentativas de abertura e até 64 pedidos posteriores
+de vídeos. São tentativas, não confirmação de leitura. O observador não altera
+o resultado da abertura nem os arquivos do jogo. Os testes concorrentes do
+limite de logs estão em `bash tools/test_native_diagnostics.sh`.
+
+**Esses 20 endereços não foram identificados em um log fatal da 0.1.9.**
+O usuário relatou que ela ainda fecha na logo, mas não forneceu o novo endereço.
+A 0.1.10 corrige omissões comprovadas e os dois ciclos de espera; avançar além
+da logo e jogar uma partida continuam dependendo do teste físico. Não há um
+bypass de vídeo aplicado: o MK usa `MwyMoviePlayer`, diferente do XMedia do
+Pinyon. ZIP/ISO e os diagnósticos anteriores são preservados.
+
+A geração completa passou por Validate/Write em 693,3 segundos: 29 arquivos
+escritos, 510 preservados e nenhum removido. O código gerado foi conferido
+independentemente contra as 114 instruções originais dos 20 corpos. São
+98.649 registros, com todos os 98.629 anteriores preservados e os 90
+intervalos manuais gerados e registrados. A compilação ARM64 passou, assim
+como 29 testes Python, 97 de importação Java e os testes nativos de logs e
+esperas. Na comparação controlada de duas esperas de 250 ms na nuvem, o código
+original consumiu 481,5 ms de CPU em 500 ms; o corrigido, 7,6 ms de CPU em
+500,1 ms. Isso mede a espera POSIX no host, não temperatura ou desempenho no F7.
+As verificações de assinatura e conteúdo do APK passaram: 4 bibliotecas ARM64
+e 47 avisos. O arquivo de fontes públicas corresponde aos 9 arquivos de SDK
+modificados e aos 5 patches, sem XEX, ISO ou binários.
+
+## Atualização anterior 0.1.9
 
 Corrige a entrada virtual omitida `0x8243FB30`, encontrada no log real da versão
 0.1.8 com LR `0x82408F90`. O corpo original de 16 bytes,
@@ -218,7 +282,7 @@ O teste dessa versão superou a falha anterior e encontrou a entrada ausente
 
 ## Instalação e teste
 
-1. Instale `MK-Experimental-0.1.9.apk` em Android 9 ou mais recente, ARM64 e Vulkan.
+1. Instale `MK-Experimental-0.1.10.apk` em Android 9 ou mais recente, ARM64 e Vulkan.
 2. Toque em **Importar ZIP ou ISO**. Selecione a ISO Xbox 360 da sua cópia do
    jogo ou um ZIP contendo exatamente um `default.xex` e todas as demais pastas
    do jogo. No ZIP, uma pasta externa envolvendo esses arquivos é aceita.
@@ -262,7 +326,7 @@ comprimidas, pacotes GOD e ISOs divididas em partes não são aceitos.
 Abra [Actions](https://github.com/AmzHook/MK-Komplet-Edition-Andrid-Recomp-X360/actions).
 O workflow **Package MK Experimental APK** compila o aplicativo Java, verifica
 as bibliotecas ARM64 previamente compiladas e empacota o APK experimental.
-Baixe o artefato `MK-Experimental-0.1.9` de uma execução concluída com sucesso.
+Baixe o artefato `MK-Experimental-0.1.10` de uma execução concluída com sucesso.
 O workflow **Build MK Importador APK** produz a variante de importação.
 O workflow experimental está habilitado para testes no aparelho. A publicação
 da variante de importação é opcional e exige a variável de repositório
@@ -274,7 +338,7 @@ artefatos incluem APK e checksum, ficam disponíveis por 30 dias e seu download
 pode exigir login no GitHub. Após extrair, confira:
 
 ```bash
-sha256sum -c MK-Experimental-0.1.9.apk.sha256
+sha256sum -c MK-Experimental-0.1.10.apk.sha256
 ```
 
 A assinatura é de desenvolvimento. Cada runner gera uma chave nova; uma build
@@ -292,11 +356,12 @@ Studio para empacotar o aplicativo.
 python3 tools/bootstrap_android.py
 python3 -m unittest discover -s tests -p 'test_*.py' -v
 bash tools/test_importer.sh
+bash tools/test_native_diagnostics.sh
 python3 tools/prepare_prebuilt_runtime.py
 bash tools/build_apk.sh --native
 ```
 
-Saída: `out/apk/MK-Experimental-0.1.9.apk`. Para compilar apenas o importador,
+Saída: `out/apk/MK-Experimental-0.1.10.apk`. Para compilar apenas o importador,
 execute `bash tools/build_apk.sh`.
 
 ## Recompilação nativa a partir da sua cópia
@@ -324,6 +389,13 @@ substitui o uso de campos privados do `jmp_buf` do Android por uma troca de
 contexto ARM64 explícita. Essa correção do runtime não resolve automaticamente
 as particularidades das fibers do jogo. Nenhum conjunto parcial de hooks de
 fibers foi aplicado ao MK.
+
+Depois de preparar os dois SDKs, Linux x86_64 com `g++` compatível com C++23
+também pode executar `bash tools/test_idle_waits.sh --compare-baseline`.
+Esse teste compila o arquivo POSIX real e confere eventos, semáforos, timeouts
+e callbacks alertáveis. Relata CPU da espera ociosa no host, sem impor um limite
+de desempenho dependente de carga nem executar o jogo. Ele não mede temperatura
+ou FPS no telefone.
 
 ## Validação e limites
 

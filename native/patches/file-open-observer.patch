@@ -1,0 +1,73 @@
+diff --git a/include/rex/kernel/xboxkrnl/io.h b/include/rex/kernel/xboxkrnl/io.h
+new file mode 100644
+index 0000000..24ca9b4
+--- /dev/null
++++ b/include/rex/kernel/xboxkrnl/io.h
+@@ -0,0 +1,27 @@
++#pragma once
++
++// Generic observer adapted from Shiftglue SDK commit
++// 2db68133de6ec609c275fd8707316a240dd980e5 under its BSD 3-Clause license.
++// Copyright (c) 2026 Tom Clay; portions derived from Xenia contributors.
++// See the SDK root LICENSE for the complete notice and license terms.
++
++#include <string_view>
++
++namespace rex::kernel::xboxkrnl {
++
++// Receives the translated guest path of each NtCreateFile/NtOpenFile attempt
++// with valid object attributes, including calls through function pointers.
++// This is called before path validation and resolution, so it does not imply
++// the file exists or the open succeeded. Attribute-relative paths stay relative.
++//
++// Runs inline on the calling guest thread. The string_view is borrowed and
++// remains valid only until the callback returns. The callback must be cheap,
++// must not throw, and must not call back into the guest file system.
++//
++// Setting nullptr prevents new loads of the observer, but does not drain a
++// callback that another thread already loaded. Callback code and any state it
++// accesses must remain alive until calling guest threads have stopped.
++using GuestFileOpenObserver = void (*)(std::string_view guest_path);
++void SetGuestFileOpenObserver(GuestFileOpenObserver observer);
++
++}  // namespace rex::kernel::xboxkrnl
+diff --git a/src/kernel/xboxkrnl/xboxkrnl_io.cpp b/src/kernel/xboxkrnl/xboxkrnl_io.cpp
+index 3f1a852..6de0cee 100644
+--- a/src/kernel/xboxkrnl/xboxkrnl_io.cpp
++++ b/src/kernel/xboxkrnl/xboxkrnl_io.cpp
+@@ -12,7 +12,10 @@
+ // Disable warnings about unused parameters for kernel functions
+ #pragma GCC diagnostic ignored "-Wunused-parameter"
+ 
++#include <atomic>
++
+ #include <rex/filesystem/device.h>
++#include <rex/kernel/xboxkrnl/io.h>
+ #include <rex/kernel/xboxkrnl/private.h>
+ #include <rex/logging.h>
+ #include <rex/memory.h>
+@@ -32,6 +35,14 @@
+ namespace rex::kernel::xboxkrnl {
+ using namespace rex::system;
+ 
++namespace {
++std::atomic<GuestFileOpenObserver> guest_file_open_observer{nullptr};
++}  // namespace
++
++void SetGuestFileOpenObserver(GuestFileOpenObserver observer) {
++  guest_file_open_observer.store(observer, std::memory_order_release);
++}
++
+ struct CreateOptions {
+   // https://processhacker.sourceforge.io/doc/ntioapi_8h.html
+   static const uint32_t FILE_DIRECTORY_FILE = 0x00000001;
+@@ -123,6 +134,9 @@ u32 NtCreateFile_entry(mapped_u32 handle_out, u32 desired_access,
+ 
+   // Compute path, possibly attrs relative.
+   auto target_path = util::TranslateAnsiPath(REX_KERNEL_MEMORY(), object_name);
++  if (auto observer = guest_file_open_observer.load(std::memory_order_acquire)) {
++    observer(target_path);
++  }
+   REXKRNL_IMPORT_TRACE(
+       "NtCreateFile", "path={} access={:#x} attrs={:#x} share={:#x} disp={:#x} options={:#x}",
+       target_path, (uint32_t)desired_access, (uint32_t)file_attributes, (uint32_t)share_access,
