@@ -25,7 +25,7 @@ import java.util.concurrent.*;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 public final class MainActivity extends Activity {
-    private static final int PICK_GAME = 10;
+    private static final int PICK_GAME = 10, PICK_DRIVER = 11;
     private final ExecutorService worker = Executors.newSingleThreadExecutor();
     private final Handler ui = new Handler(Looper.getMainLooper());
     private final AtomicBoolean cancel = new AtomicBoolean();
@@ -34,6 +34,11 @@ public final class MainActivity extends Activity {
     private ProgressBar progress;
     private ZipImporter.Result installed;
     private boolean busy, destroyed;
+    private LauncherUi launcher;
+    private RuntimeSettings settings;
+    private File driversRoot;
+    private java.util.List<DriverManager.Driver> drivers = new java.util.ArrayList<>();
+    private boolean driverCatalogReady;
     private File storage;
     private String expectedHash;
     private boolean nativeAvailable;
@@ -65,73 +70,203 @@ public final class MainActivity extends Activity {
             if (hash.matches("[0-9a-f]{64}")) expectedHash = hash;
         } catch (IOException ignored) { }
         nativeAvailable = expectedHash != null && new File(getApplicationInfo().nativeLibraryDir, "libmk_komplete.so").isFile();
-        getWindow().setStatusBarColor(Color.rgb(15,17,23));
-        getWindow().setNavigationBarColor(Color.rgb(15,17,23));
-        ScrollView scroll = new ScrollView(this); scroll.setFillViewport(true);
-        scroll.setBackgroundColor(Color.rgb(15,17,23));
-        LinearLayout content = new LinearLayout(this); content.setOrientation(LinearLayout.VERTICAL);
-        content.setPadding(dp(24), dp(26), dp(24), dp(24));
-        scroll.addView(content);
-        scroll.setOnApplyWindowInsetsListener((view, insets) -> {
-            view.setPadding(insets.getSystemWindowInsetLeft(), insets.getSystemWindowInsetTop(),
-                    insets.getSystemWindowInsetRight(), insets.getSystemWindowInsetBottom());
-            return insets;
+        settings = new RuntimeSettings(this);
+        driversRoot = new File(getFilesDir(), "graphics-drivers");
+        getWindow().setStatusBarColor(Color.BLACK);
+        getWindow().setNavigationBarColor(Color.BLACK);
+        launcher = new LauncherUi(this, nativeAvailable, appVersion, new LauncherUi.Callbacks() {
+            public void onPlay() { launchGame(); }
+            public void onOptions() { launcher.showOptions(!launcher.isOptionsVisible()); }
+            public void onImport() { pickArchive(); }
+            public void onExit() { if (busy) onBackPressed(); else finish(); }
+            public void onDetails() { showDetails(); }
+            public void onLog() { showRuntimeLog(); }
+            public void onRemove() { confirmRemoveGame(); }
+            public void onChooseDriver() { chooseDriver(); }
+            public void onDriverManage() { manageDrivers(); }
+            public void onSetting(String key) { changeSetting(key); }
         });
-        content.addView(text(nativeAvailable ? "MK  /  EXPERIMENTAL" : "MK  /  IMPORTADOR", 13, gold));
-        content.addView(text("Sua cópia.\nNo seu aparelho.", 32, Color.WHITE));
-        content.addView(text("Importe a ISO da sua cópia de Mortal Kombat Komplete Edition para Xbox 360 ou um ZIP com o default.xex e todas as pastas do jogo.", 16, muted));
-        TextView limitation = text(nativeAvailable
-                ? "Versão experimental. Importe sua cópia para testar a inicialização; funcionamento e desempenho ainda precisam ser verificados."
-                : "Esta versão importa os arquivos. A execução de Mortal Kombat ainda não está disponível.", 16, gold);
-        limitation.setPadding(dp(16), dp(16), dp(16), dp(16));
-        limitation.setBackgroundColor(Color.rgb(40,34,24)); content.addView(limitation);
-        status = text("Nenhuma cópia importada", 21, Color.WHITE); content.addView(status);
-        summary = text("", 15, muted); content.addView(summary);
-        importButton = button("Importar ZIP ou ISO"); importButton.setTextColor(Color.BLACK);
-        importButton.setBackgroundTintList(android.content.res.ColorStateList.valueOf(gold)); content.addView(importButton);
-        progress = new ProgressBar(this); progress.setVisibility(View.GONE); content.addView(progress);
-        path = text("", 13, muted); path.setMaxLines(3); content.addView(path);
-        cancelButton = button("Cancelar importação"); cancelButton.setVisibility(View.GONE); content.addView(cancelButton);
-        detailsButton = button("Detalhes da importação"); content.addView(detailsButton);
-        playButton = button("Testar inicialização do jogo");
-        playButton.setVisibility(nativeAvailable ? View.VISIBLE : View.GONE); content.addView(playButton);
-        logButton = button("Ver log de inicialização");
-        logButton.setVisibility(nativeAvailable ? View.VISIBLE : View.GONE); content.addView(logButton);
-        removeButton = button("Remover arquivos importados"); content.addView(removeButton);
-        note = text("Os arquivos ficam no armazenamento privado deste aplicativo. Não há envio pela rede. Desinstalar o APK remove a cópia importada.\n\nReserve espaço para os arquivos extraídos. Alguns locais de armazenamento também exigem uma cópia temporária da ISO. O arquivo original é preservado.", 13, muted);
-        content.addView(note);
-        TextView footer = text("VERSÃO " + appVersion + (nativeAvailable ? "  ·  INICIALIZAÇÃO EXPERIMENTAL" : "  ·  IMPORTAÇÃO LOCAL"), 12, muted);
-        footer.setGravity(Gravity.CENTER); content.addView(footer);
-        setContentView(scroll);
-        importButton.setOnClickListener(view -> pickArchive());
+        status = launcher.status; summary = launcher.summary; path = launcher.path; note = launcher.note;
+        importButton = launcher.importButton; cancelButton = launcher.cancelButton;
+        detailsButton = launcher.detailsButton; removeButton = launcher.removeButton;
+        playButton = launcher.playButton; logButton = launcher.logButton; progress = launcher.progress;
         cancelButton.setOnClickListener(view -> { cancelImport(); cancelButton.setEnabled(false); status.setText("Cancelando…"); });
-        detailsButton.setOnClickListener(view -> showDetails());
-        playButton.setOnClickListener(view -> {
-            if (!nativeAvailable || installed == null || !installed.sha256.equals(expectedHash)) return;
-            File gameRoot = new File(new File(storage, "game"), installed.xexPath).getParentFile();
-            Intent game = new Intent().setClassName(getPackageName(), getPackageName() + ".GameActivity");
-            game.putExtra("game_root", gameRoot.getAbsolutePath());
-            game.putExtra("cache_root", new File(getCacheDir(), "mk-runtime").getAbsolutePath());
-            game.putExtra("user_root", new File(getFilesDir(), "mk-user").getAbsolutePath());
-            startActivity(game);
-        });
-        logButton.setOnClickListener(view -> showRuntimeLog());
-        removeButton.setOnClickListener(view -> new AlertDialog.Builder(this)
-                .setTitle("Remover a cópia importada?")
-                .setMessage("Os arquivos dentro do aplicativo serão apagados. O arquivo original será preservado.")
-                .setNegativeButton("Manter", null).setPositiveButton("Remover", (dialog, which) -> removeGame()).show());
+        launcher.addOption("fill_screen", "Preencher a tela", "Desligado: proporção do jogo com barras.", "Desligado");
+        launcher.addOption("resolution", "Resolução interna", "1× original; 2× aumenta a carga da GPU. Aplica ao iniciar.", "1×");
+        launcher.addOption("vsync", "Sincronização vertical", "Sincroniza a apresentação com a tela. Aplica ao iniciar.", "Ligado");
+        launcher.addOption("trace_assets", "Registro de arquivos", "Ajuda a identificar a última tentativa antes de uma falha.", "Ligado");
+        launcher.addOption("reset", "Restaurar opções", "Volta aos ajustes padrão e ao driver do aparelho.", "Restaurar");
+        setContentView(launcher.root());
+        refreshSettings();
         setBusy(true);
         worker.execute(() -> {
             try {
                 ZipImporter.Result result = GameImporter.recover(storage, new File(getCacheDir(), "mk-iso-import"));
-                post(() -> { installed = result; setBusy(false); refresh(); });
+                java.util.List<DriverManager.Driver> catalog;
+                try { catalog = DriverManager.listInstalled(driversRoot); }
+                catch (IOException ignored) { catalog = new java.util.ArrayList<>(); }
+                final java.util.List<DriverManager.Driver> recoveredDrivers = catalog;
+                post(() -> { installed = result; drivers = recoveredDrivers; driverCatalogReady = true; setBusy(false); refresh(); refreshSettings(); });
             } catch (IOException error) { post(() -> { setBusy(false); showFailure(error); }); }
         });
     }
 
+    private void launchGame() {
+        if (busy || !nativeAvailable || installed == null || !installed.sha256.equals(expectedHash)) return;
+        File gameRoot = new File(new File(storage, "game"), installed.xexPath).getParentFile();
+        Intent game = new Intent().setClassName(getPackageName(), getPackageName() + ".GameActivity");
+        game.putExtra("game_root", gameRoot.getAbsolutePath());
+        game.putExtra("cache_root", new File(getCacheDir(), "mk-runtime").getAbsolutePath());
+        game.putExtra("user_root", new File(getFilesDir(), "mk-user").getAbsolutePath());
+        game.putExtra("driver_id", settings.driverId());
+        game.putExtra("fill_screen", settings.fillScreen());
+        game.putExtra("resolution", settings.resolution());
+        game.putExtra("vsync", settings.vsync());
+        game.putExtra("trace_assets", settings.traceAssets());
+        startActivity(game);
+    }
+    private void refreshSettings() {
+        launcher.setOptionValue("fill_screen", settings.fillScreen() ? "Ligado" : "Desligado");
+        launcher.setOptionValue("resolution", settings.resolution() + "×");
+        launcher.setOptionValue("vsync", settings.vsync() ? "Ligado" : "Desligado");
+        launcher.setOptionValue("trace_assets", settings.traceAssets() ? "Ligado" : "Desligado");
+        DriverManager.Driver selected = null;
+        for (DriverManager.Driver driver : drivers) if (driver.id.equals(settings.driverId())) selected = driver;
+        if (selected == null) {
+            if (driverCatalogReady) settings.setDriver("");
+            launcher.setDriverLabel("Padrão do aparelho");
+            launcher.setDriverDescription("Driver Vulkan do sistema. Importe um ZIP Turnip para escolher outro.");
+        } else {
+            launcher.setDriverLabel(selected.name);
+            launcher.setDriverDescription(selected.driverVersion + " · Aplica ao iniciar o jogo.");
+        }
+    }
+    private void changeSetting(String key) {
+        if (busy) return;
+        switch (key) {
+            case "fill_screen": settings.setBoolean(key, !settings.fillScreen()); break;
+            case "vsync": settings.setBoolean(key, !settings.vsync()); break;
+            case "trace_assets": settings.setBoolean(key, !settings.traceAssets()); break;
+            case "resolution":
+                dialogBuilder().setTitle("Resolução interna")
+                        .setSingleChoiceItems(new String[]{"1× · original", "2× · maior detalhe"}, settings.resolution() - 1,
+                                (dialog, which) -> { settings.setResolution(which + 1); refreshSettings(); dialog.dismiss(); })
+                        .setNegativeButton("Voltar", null).show(); return;
+            case "reset": settings.reset(); break;
+            default: return;
+        }
+        refreshSettings();
+    }
+    private void chooseDriver() {
+        if (busy) return;
+        String[] choices = new String[drivers.size() + 1]; choices[0] = "Padrão do aparelho";
+        int selected = 0;
+        for (int i = 0; i < drivers.size(); ++i) {
+            DriverManager.Driver driver = drivers.get(i);
+            choices[i + 1] = driver.name + (driver.driverVersion.isEmpty() ? "" : " · " + driver.driverVersion);
+            if (driver.id.equals(settings.driverId())) selected = i + 1;
+        }
+        dialogBuilder().setTitle("Driver gráfico")
+                .setSingleChoiceItems(choices, selected, (dialog, which) -> {
+                    if (which > 0 && drivers.get(which - 1).minApi > android.os.Build.VERSION.SDK_INT) {
+                        Toast.makeText(this, "Este driver exige uma versão mais recente do Android.", Toast.LENGTH_LONG).show(); return;
+                    }
+                    settings.setDriver(which == 0 ? "" : drivers.get(which - 1).id); refreshSettings(); dialog.dismiss();
+                }).setPositiveButton("Importar ZIP", (dialog, which) -> pickDriver())
+                .setNeutralButton("Remover driver", (dialog, which) -> chooseDriverToRemove())
+                .setNegativeButton("Voltar", null).show();
+    }
+    private void pickDriver() {
+        if (busy) return;
+        Intent intent = new Intent(Intent.ACTION_OPEN_DOCUMENT).addCategory(Intent.CATEGORY_OPENABLE).setType("*/*");
+        intent.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION); startActivityForResult(intent, PICK_DRIVER);
+    }
+    private void manageDrivers() {
+        if (busy) return;
+        dialogBuilder().setTitle("Drivers personalizados")
+                .setItems(new String[]{"Importar driver ZIP", "Remover driver instalado"}, (dialog, which) -> {
+                    if (which == 0) pickDriver();
+                    else if (drivers.isEmpty()) Toast.makeText(this, "Nenhum driver importado.", Toast.LENGTH_SHORT).show();
+                    else chooseDriverToRemove();
+                }).setNegativeButton("Voltar", null).show();
+    }
+    private void importDriver(Uri uri) {
+        if (busy) return;
+        cancel.set(false); setBusy(true); status.setText("Importando driver…");
+        CancellationSignal signal = new CancellationSignal(); sourceCancellation = signal;
+        cancelButton.setVisibility(View.VISIBLE); cancelButton.setEnabled(true);
+        worker.execute(() -> {
+            try (ArchiveInput input = openArchive(uri, signal)) {
+                activeInput = input;
+                DriverManager.Driver imported = DriverManager.install(input.stream, driversRoot,
+                        DriverManager.Limits.defaults(), cancel,
+                        (files, bytes, name) -> post(() -> { summary.setText(files + " arquivos · " + size(bytes)); path.setText(name); }));
+                java.util.List<DriverManager.Driver> catalog = DriverManager.listInstalled(driversRoot);
+                post(() -> {
+                    drivers = catalog; driverCatalogReady = true;
+                    if (imported.minApi <= android.os.Build.VERSION.SDK_INT) settings.setDriver(imported.id);
+                    setBusy(false); refresh(); refreshSettings(); launcher.showOptions(true);
+                    Toast.makeText(this, "Driver importado: " + imported.name, Toast.LENGTH_LONG).show();
+                });
+            } catch (IOException | SecurityException | android.os.OperationCanceledException error) {
+                Exception failure = cancel.get() ? new DriverManager.Cancelled() : error;
+                post(() -> { setBusy(false); refresh(); showFailure(failure); });
+            } finally { activeInput = null; if (sourceCancellation == signal) sourceCancellation = null; }
+        });
+    }
+    private void chooseDriverToRemove() {
+        if (busy || drivers.isEmpty()) return;
+        String[] choices = new String[drivers.size()];
+        for (int i = 0; i < choices.length; ++i) choices[i] = drivers.get(i).name;
+        dialogBuilder().setTitle("Remover driver importado").setItems(choices, (dialog, which) -> {
+            DriverManager.Driver driver = drivers.get(which);
+            dialogBuilder().setTitle("Remover " + driver.name + "?")
+                    .setMessage("Os arquivos do jogo serão preservados.")
+                    .setNegativeButton("Manter", null).setPositiveButton("Remover", (confirmation, button) -> {
+                        setBusy(true); worker.execute(() -> {
+                            try {
+                                DriverManager.remove(driversRoot, driver.id);
+                                java.util.List<DriverManager.Driver> catalog = DriverManager.listInstalled(driversRoot);
+                                post(() -> { drivers = catalog; setBusy(false); refresh(); refreshSettings(); });
+                            } catch (IOException error) { post(() -> { setBusy(false); showFailure(error); }); }
+                        });
+                    }).show();
+        }).setNegativeButton("Voltar", null).show();
+    }
+    private void confirmRemoveGame() {
+        if (busy || installed == null) return;
+        dialogBuilder().setTitle("Remover a cópia importada?")
+                .setMessage("Os arquivos dentro do aplicativo serão apagados. O arquivo original será preservado.")
+                .setNegativeButton("Manter", null).setPositiveButton("Remover", (dialog, which) -> removeGame()).show();
+    }
+    private AlertDialog.Builder dialogBuilder() {
+        return new AlertDialog.Builder(this).setOnKeyListener((interfaceDialog, key, event) -> {
+            if (event.getAction() != android.view.KeyEvent.ACTION_DOWN || event.getRepeatCount() != 0) return false;
+            if (key == android.view.KeyEvent.KEYCODE_BUTTON_B) { interfaceDialog.cancel(); return true; }
+            if (key == android.view.KeyEvent.KEYCODE_BUTTON_A && interfaceDialog instanceof AlertDialog) {
+                AlertDialog dialog = (AlertDialog) interfaceDialog;
+                View focus = dialog.getCurrentFocus();
+                if (focus instanceof ListView) {
+                    ListView list = (ListView) focus; int selected = list.getSelectedItemPosition();
+                    if (selected >= 0) return list.performItemClick(list.getSelectedView(), selected, list.getSelectedItemId());
+                }
+                return focus != null && focus.isEnabled() && focus.performClick();
+            }
+            return false;
+        });
+    }
+    @Override public boolean dispatchKeyEvent(android.view.KeyEvent event) {
+        if (event.getAction() == android.view.KeyEvent.ACTION_DOWN && event.getRepeatCount() == 0) {
+            if (event.getKeyCode() == android.view.KeyEvent.KEYCODE_BUTTON_A) {
+                View focus = getCurrentFocus(); if (focus != null && focus.isEnabled()) return focus.performClick();
+            } else if (event.getKeyCode() == android.view.KeyEvent.KEYCODE_BUTTON_B) { onBackPressed(); return true; }
+        }
+        return super.dispatchKeyEvent(event);
+    }
     private void post(Runnable action) { ui.post(() -> { if (!destroyed) action.run(); }); }
     private void setBusy(boolean value) {
         busy = value; importButton.setEnabled(!value);
+        launcher.setSettingsEnabled(!value);
         detailsButton.setEnabled(!value && installed != null); removeButton.setEnabled(!value && installed != null);
         playButton.setEnabled(!value && nativeAvailable && installed != null && installed.sha256.equals(expectedHash));
         progress.setVisibility(value ? View.VISIBLE : View.GONE);
@@ -141,7 +276,9 @@ public final class MainActivity extends Activity {
     }
     private static String size(long bytes) { return String.format(Locale.getDefault(), "%.1f GB", bytes / 1073741824.0); }
     private void refresh() {
-        status.setText(installed == null ? "Nenhuma cópia importada" : "Arquivos importados");
+        boolean ready = nativeAvailable && installed != null && installed.sha256.equals(expectedHash);
+        launcher.setLibraryReady(ready);
+        status.setText(installed == null ? "Nenhuma cópia importada" : ready ? "✓ Jogo importado" : "Arquivos importados");
         summary.setText(installed == null ? "Selecione um ZIP ou uma ISO para começar." : installed.files + " arquivos · " + size(installed.bytes));
         if (nativeAvailable && installed != null && !installed.sha256.equals(expectedHash))
             summary.append("\nEste executável não corresponde à versão usada nesta build. Importe a cópia com o XEX compatível.");
@@ -151,7 +288,7 @@ public final class MainActivity extends Activity {
     }
     private void pickArchive() {
         if (installed != null) {
-            new AlertDialog.Builder(this).setTitle("Substituir a cópia importada?")
+            dialogBuilder().setTitle("Substituir a cópia importada?")
                     .setMessage("A cópia atual será substituída somente se a nova importação terminar com sucesso.")
                     .setNegativeButton("Cancelar", null).setPositiveButton("Escolher arquivo", (dialog, which) -> openPicker()).show();
         } else openPicker();
@@ -166,6 +303,8 @@ public final class MainActivity extends Activity {
         super.onActivityResult(request, result, intent);
         if (request == PICK_GAME && result == RESULT_OK && intent != null && intent.getData() != null)
             importArchive(intent.getData());
+        else if (request == PICK_DRIVER && result == RESULT_OK && intent != null && intent.getData() != null)
+            importDriver(intent.getData());
     }
     private static final class ArchiveInput implements Closeable {
         final InputStream stream;
@@ -234,7 +373,7 @@ public final class MainActivity extends Activity {
     private void showFailure(Exception error) {
         String message = error.getMessage();
         if (message == null || message.trim().isEmpty()) message = "Não foi possível importar o ZIP ou a ISO. Verifique o arquivo e o espaço livre.";
-        new AlertDialog.Builder(this).setTitle(error instanceof ZipImporter.Cancelled ? "Importação cancelada" : "Importação não concluída")
+        dialogBuilder().setTitle((error instanceof ZipImporter.Cancelled || error instanceof DriverManager.Cancelled) ? "Importação cancelada" : "Importação não concluída")
                 .setMessage(message).setPositiveButton("OK", null).show();
     }
     private void showDetails() {
@@ -243,7 +382,7 @@ public final class MainActivity extends Activity {
                 + " bytes\nXEX: " + installed.xexPath + "\nSHA-256: " + installed.sha256
                 + "\n\nCabeçalho XEX2 verificado. Isso não confirma que o executável é do MK ou que é compatível.\nRuntime: "
                 + (nativeAvailable ? "experimental; inicialização não validada em aparelho." : "não integrado nesta build.");
-        new AlertDialog.Builder(this).setTitle("Detalhes da importação").setMessage(report)
+        dialogBuilder().setTitle("Detalhes da importação").setMessage(report)
                 .setPositiveButton("Fechar", null).setNeutralButton("Copiar", (dialog, which) -> {
                     ClipboardManager clipboard = (ClipboardManager)getSystemService(CLIPBOARD_SERVICE);
                     clipboard.setPrimaryClip(ClipData.newPlainText("MK Importador", report));
@@ -264,7 +403,7 @@ public final class MainActivity extends Activity {
         TextView viewer = text(report, 12, Color.WHITE); viewer.setTextIsSelectable(true);
         viewer.setPadding(dp(16), dp(12), dp(16), dp(12));
         ScrollView scroll = new ScrollView(this); scroll.addView(viewer);
-        new AlertDialog.Builder(this).setTitle("Log de inicialização").setView(scroll)
+        dialogBuilder().setTitle("Log de inicialização").setView(scroll)
                 .setPositiveButton("Fechar", null).setNeutralButton("Copiar", (dialog, which) -> {
                     ClipboardManager clipboard = (ClipboardManager)getSystemService(CLIPBOARD_SERVICE);
                     clipboard.setPrimaryClip(ClipData.newPlainText("Log MK", report));
@@ -280,8 +419,9 @@ public final class MainActivity extends Activity {
         });
     }
     @Override public void onBackPressed() {
+        if (!busy && launcher != null && launcher.isOptionsVisible()) { launcher.showOptions(false); return; }
         if (busy) {
-            new AlertDialog.Builder(this).setTitle("Cancelar e sair?")
+            dialogBuilder().setTitle("Cancelar e sair?")
                     .setMessage("Uma importação incompleta será descartada.")
                     .setNegativeButton("Continuar", null)
                     .setPositiveButton("Sair", (dialog, which) -> { cancelImport(); finish(); }).show();

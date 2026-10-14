@@ -17,7 +17,7 @@ def digest(stream):
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument('apk', type=Path, nargs='?', default=REPO / 'out/apk/MK-Experimental-0.1.10.apk')
+    parser.add_argument('apk', type=Path, nargs='?', default=REPO / 'out/apk/MK-Experimental-0.1.11.apk')
     args = parser.parse_args()
     staged = REPO / 'out/native'
     try:
@@ -36,10 +36,10 @@ def main():
                     if digest(packaged) != digest(original):
                         raise ValueError('Packaged content differs from staged input: ' + name)
             dex = archive.read('classes.dex')
-            for descriptor in [b'Lorg/amzhook/mkimporter/GameActivity;', b'Lorg/libsdl/app/SDLActivity;', b'Lorg/amzhook/mkimporter/MainActivity;', b'Lorg/amzhook/mkimporter/IsoImporter;', b'Lorg/amzhook/mkimporter/GameImporter;']:
+            for descriptor in [b'Lorg/amzhook/mkimporter/GameActivity;', b'Lorg/libsdl/app/SDLActivity;', b'Lorg/amzhook/mkimporter/MainActivity;', b'Lorg/amzhook/mkimporter/IsoImporter;', b'Lorg/amzhook/mkimporter/GameImporter;', b'Lorg/amzhook/mkimporter/LauncherUi;', b'Lorg/amzhook/mkimporter/DriverManager;', b'Lorg/amzhook/mkimporter/RuntimeSettings;']:
                 if descriptor not in dex:
                     raise ValueError('Required Android class is absent from DEX.')
-        print(f'Verified APK payload: 4 ARM64 libraries, matching XEX metadata, SDL activity and {len(required) - 5} license/source notices. No XEX/ISO packaged.')
+        print(f'Verified APK payload: 9 ARM64 libraries, matching XEX metadata, launcher/options and {len(required) - 10} license/source notices. No XEX/ISO packaged.')
     except (OSError, ValueError, KeyError, zipfile.BadZipFile) as error:
         parser.exit(1, str(error) + '\n')
 

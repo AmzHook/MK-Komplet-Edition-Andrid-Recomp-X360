@@ -3,12 +3,15 @@
 #include "mk_file_trace.h"
 
 #include <rex/logging.h>
+#include <rex/cvar.h>
 #include <rex/filesystem/vfs.h>
 #include <rex/kernel/xboxkrnl/io.h>
 #include <SDL3/SDL_events.h>
 
 #include <filesystem>
 #include <system_error>
+
+REXCVAR_DEFINE_BOOL(mk_trace_assets, true, "MK", "Log bounded startup and movie file-open attempts");
 
 namespace {
 mk::diagnostics::FileTraceBudget file_trace_budget;
@@ -54,13 +57,13 @@ void MkAndroidApp::OnLoadXexImage(std::string& image) {
 }
 
 void MkAndroidApp::OnPostInitLogging() {
-  REXLOG_INFO("MK experimental Android runtime 0.1.10: gameplay has not been validated");
+  REXLOG_INFO("MK experimental Android runtime 0.1.11: gameplay has not been validated");
   REXLOG_INFO("MK Android idle waits: SDL poll sentinel enabled={}",
               SDL_EventEnabled(SDL_EVENT_POLL_SENTINEL));
 }
 
 void MkAndroidApp::OnPostLoadXexImage() {
-  rex::kernel::xboxkrnl::SetGuestFileOpenObserver(TraceGuestFileAttempt);
+  rex::kernel::xboxkrnl::SetGuestFileOpenObserver(REXCVAR_GET(mk_trace_assets) ? TraceGuestFileAttempt : nullptr);
   // Read-only diagnostics: use the same guest VFS as MK, including its
   // case-insensitive host fallback. Missing optional config is not fatal here.
   auto* file_system = runtime()->file_system();

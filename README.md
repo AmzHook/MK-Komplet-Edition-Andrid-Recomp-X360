@@ -12,7 +12,49 @@ O usuário fornece a ISO ou um ZIP com o XEX e as demais pastas do jogo; o
 aplicativo não baixa esses arquivos. O APK `MK-Importador` continua disponível
 como variante que apenas importa arquivos, sem execução.
 
-## Atualização experimental 0.1.10
+## Atualização experimental 0.1.11
+
+O launcher agora usa um menu MK em vermelho e preto, inspirado na referência
+fornecida: botões **JOGAR**, **OPÇÕES**, **ARQUIVOS DO JOGO** e **SAIR**, estado
+da biblioteca e painel de opções separado em paisagem. As escolhas ficam
+salvas; toque, foco por direcional e botões A/B do controle são aceitos no menu.
+
+Em **OPÇÕES**, estão disponíveis ajustes reais de preenchimento da tela,
+resolução interna 1×/2×, sincronização vertical e registro limitado de arquivos.
+Os ajustes são enviados ao runtime ao iniciar o jogo. Não foram adicionados
+controles de toque ou um editor de controles.
+
+**Driver gráfico** permite escolher **Padrão do aparelho** ou um driver ARM64
+importado. Use **Drivers personalizados → Importar driver ZIP** para selecionar
+um pacote AdrenoTools/Turnip com `meta.json` e sua biblioteca. A importação
+valida caminhos, CRC, limites, metadados e ELF ARM64; ela não executa a biblioteca.
+A cópia do jogo e a instalação dos drivers ficam em pastas privadas separadas.
+Remover um driver preserva o jogo.
+
+O carregamento customizado usa o AdrenoTools, com seus hooks empacotados e os
+namespaces necessários aos drivers Android. O runtime tenta o driver do sistema
+quando não consegue preparar o loader customizado ou inicializar sua instância
+Vulkan. O log distingue o driver solicitado das propriedades do dispositivo
+efetivamente inicializado: um handle de loader não comprova uso do Turnip.
+Compatibilidade de cada pacote com Adreno 825, criação do dispositivo Vulkan e
+jogabilidade ainda exigem teste no Poco F7. Nenhum driver Turnip é incluído.
+
+AdrenoTools está fixado em `8fae8ce254dfc1344527e05301e43f37dea2df80` e o helper
+de namespaces em `aa3975893d83ef1bc84c321ec60c65fbf1287887`, com downloads por
+HTTPS e SHA-256 verificado. Os dois usam BSD de duas cláusulas; avisos e fontes
+correspondentes estão distribuídos com o runtime. A build contém nove bibliotecas
+ARM64. Os 90 intervalos manuais e as correções da 0.1.10 foram preservados.
+
+Os testes de importação de drivers estão em `bash tools/test_driver_importer.sh`:
+63 casos passaram, incluindo cancelamento, fontes inválidas, arquivos maliciosos
+e preservação de instalações anteriores. Também passaram os 29 testes Python
+e os 97 testes de importação do jogo. A build nativa, a assinatura do APK e a
+inspeção das nove bibliotecas ARM64 com alinhamento de 16 KiB foram verificadas.
+A aparência no F7 e o carregamento de um driver importado seguem pendentes de
+teste no aparelho. Consulte
+[opções e drivers](docs/options-and-drivers.md) para uso e limitações.
+
+## Atualização anterior 0.1.10
 
 A pesquisa no GitHub identificou duas correções do Shiftglue que correspondem
 ao trecho do Reddit fornecido pelo usuário. Foram adaptadas no patch
@@ -201,7 +243,7 @@ continuam sem validação.**
 ## Atualização anterior 0.1.6
 
 Adiciona a importação direta de ISO Xbox 360 com uma partição XDVDFS em setores
-de 2048 bytes. O botão **Importar ZIP ou ISO** extrai os arquivos da partição do
+de 2048 bytes. O botão **ARQUIVOS DO JOGO** extrai os arquivos da partição do
 jogo para a mesma pasta privada usada pelo importador de ZIP. Não é preciso
 extrair a ISO em outro programa antes de selecionar o arquivo no aplicativo.
 
@@ -282,17 +324,17 @@ O teste dessa versão superou a falha anterior e encontrou a entrada ausente
 
 ## Instalação e teste
 
-1. Instale `MK-Experimental-0.1.10.apk` em Android 9 ou mais recente, ARM64 e Vulkan.
-2. Toque em **Importar ZIP ou ISO**. Selecione a ISO Xbox 360 da sua cópia do
+1. Instale `MK-Experimental-0.1.11.apk` em Android 9 ou mais recente, ARM64 e Vulkan.
+2. Toque em **ARQUIVOS DO JOGO**. Selecione a ISO Xbox 360 da sua cópia do
    jogo ou um ZIP contendo exatamente um `default.xex` e todas as demais pastas
    do jogo. No ZIP, uma pasta externa envolvendo esses arquivos é aceita.
    Somente o XEX não fornece os dados necessários ao jogo.
 3. Mantenha o aplicativo aberto até terminar a importação. Se aparecer
    **Preparando ISO para importação…**, aguarde a cópia temporária e a extração.
    **Cancelar importação** interrompe a operação e mantém a cópia anterior.
-4. Toque em **Testar inicialização do jogo**. Esta versão usa a entrada SDL e
+4. Toque em **JOGAR**. Esta versão usa a entrada SDL e
    requer um controle físico compatível; ainda não possui controles de toque.
-5. Depois de uma tentativa, **Ver log de inicialização** permite ler e copiar o
+5. Depois de uma tentativa, **OPÇÕES → Log de inicialização → Abrir log** permite ler e copiar o
    log salvo. Se ocorrer uma falha nativa, abra novamente o aplicativo para
    consultar o log que tenha sido gravado.
 
@@ -326,7 +368,7 @@ comprimidas, pacotes GOD e ISOs divididas em partes não são aceitos.
 Abra [Actions](https://github.com/AmzHook/MK-Komplet-Edition-Andrid-Recomp-X360/actions).
 O workflow **Package MK Experimental APK** compila o aplicativo Java, verifica
 as bibliotecas ARM64 previamente compiladas e empacota o APK experimental.
-Baixe o artefato `MK-Experimental-0.1.10` de uma execução concluída com sucesso.
+Baixe o artefato `MK-Experimental-0.1.11` de uma execução concluída com sucesso.
 O workflow **Build MK Importador APK** produz a variante de importação.
 O workflow experimental está habilitado para testes no aparelho. A publicação
 da variante de importação é opcional e exige a variável de repositório
@@ -338,7 +380,7 @@ artefatos incluem APK e checksum, ficam disponíveis por 30 dias e seu download
 pode exigir login no GitHub. Após extrair, confira:
 
 ```bash
-sha256sum -c MK-Experimental-0.1.10.apk.sha256
+sha256sum -c MK-Experimental-0.1.11.apk.sha256
 ```
 
 A assinatura é de desenvolvimento. Cada runner gera uma chave nova; uma build
@@ -357,11 +399,13 @@ python3 tools/bootstrap_android.py
 python3 -m unittest discover -s tests -p 'test_*.py' -v
 bash tools/test_importer.sh
 bash tools/test_native_diagnostics.sh
+bash tools/test_driver_importer.sh
 python3 tools/prepare_prebuilt_runtime.py
 bash tools/build_apk.sh --native
+python3 tools/verify_native_apk.py
 ```
 
-Saída: `out/apk/MK-Experimental-0.1.10.apk`. Para compilar apenas o importador,
+Saída: `out/apk/MK-Experimental-0.1.11.apk`. Para compilar apenas o importador,
 execute `bash tools/build_apk.sh`.
 
 ## Recompilação nativa a partir da sua cópia

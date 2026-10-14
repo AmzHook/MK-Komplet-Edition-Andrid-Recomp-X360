@@ -1,4 +1,4 @@
-# Importação de ISO Xbox 360 · APK 0.1.10
+# Importação de ISO Xbox 360 · APK 0.1.11
 
 Desde a versão 0.1.6, o APK aceita uma ISO Xbox 360 pelo botão **Importar ZIP ou
 ISO**. Ele extrai os arquivos da partição do jogo para o armazenamento privado
@@ -9,22 +9,22 @@ O recurso foi validado com imagens sintéticas. Nenhuma ISO real de Mortal
 Kombat Komplete Edition foi fornecida para este teste. A importação dessa cópia
 e o comportamento dos provedores de arquivos no Poco F7 ainda precisam ser
 verificados. Carregamento completo, partidas, áudio e desempenho do runtime
-continuam sem validação. A versão 0.1.10 preserva esse importador e contém 90
+continuam sem validação. A versão 0.1.11 preserva esse importador e contém 90
 intervalos de funções nativas comprovados; consulte o histórico no README.
 
 ## Como importar
 
-1. Instale `MK-Experimental-0.1.10.apk` e abra o aplicativo.
-2. Toque em **Importar ZIP ou ISO** e selecione a ISO da sua cópia Xbox 360.
+1. Instale `MK-Experimental-0.1.11.apk` e abra o aplicativo.
+2. Toque em **ARQUIVOS DO JOGO** e selecione a ISO da sua cópia Xbox 360.
 3. Mantenha o aplicativo aberto durante a preparação e a extração. O botão
    **Cancelar importação** interrompe a operação; uma tentativa que falha ou é
    cancelada mantém a cópia anterior.
-4. Após a importação, confira os detalhes do executável. **Testar inicialização
-   do jogo** só fica disponível se o SHA-256 do XEX corresponder ao usado na
+4. Após a importação, confira os detalhes do executável. **JOGAR** só fica
+   disponível se o SHA-256 do XEX corresponder ao usado na
    build nativa. Os dados dessa versão estão no [README](../README.md).
 5. Use um controle físico compatível para o teste; o aplicativo ainda não
-   oferece controles de toque. Após uma tentativa, consulte **Ver log de
-   inicialização**, reabrindo o aplicativo se o processo nativo fechar.
+   oferece controles de toque. Após uma tentativa, use **OPÇÕES → Log de
+   inicialização → Abrir log**, reabrindo o aplicativo se o processo nativo fechar.
 
 A ISO deve conter exatamente um `default.xex` e os arquivos do jogo. A extração
 não transforma outro executável em uma versão compatível. Importar só um XEX

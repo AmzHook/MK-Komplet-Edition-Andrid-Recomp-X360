@@ -16,6 +16,7 @@ if [ ! -f "$project_root/.xex-input" ] || [ "$(cat "$project_root/.xex-input")" 
 fi
 test -f "$project_root/generated/default/sources.cmake" || { echo 'MK code generation has not completed.' >&2; exit 1; }
 python3 tools/bootstrap_native.py
+python3 tools/bootstrap_adrenotools.py
 bash tools/build_runtime.sh
 native_root="${MK_NATIVE_TOOLS:-/workspace/.tools/mk-native}"
 cmake_bin="$native_root/sdk/cmake/3.31.6/bin/cmake"
@@ -37,6 +38,9 @@ for library in libmk_komplete.so librexruntime.so librexgpu-xenos.so; do
     cp "$build_root/lib/$library" out/native/jniLibs/arm64-v8a/
 done
 cp "$ndk_root/toolchains/llvm/prebuilt/linux-x86_64/sysroot/usr/lib/aarch64-linux-android/libc++_shared.so" out/native/jniLibs/arm64-v8a/
+for library in libadrenotools.so libmain_hook.so libhook_impl.so libfile_redirect_hook.so libgsl_alloc_hook.so; do
+    cp "$native_root/build-adrenotools-arm64/lib/$library" out/native/jniLibs/arm64-v8a/
+done
 "$ndk_root/toolchains/llvm/prebuilt/linux-x86_64/bin/llvm-strip" --strip-unneeded out/native/jniLibs/arm64-v8a/*.so
 export MK_NATIVE_SOURCE_ROOT="$sdk_root" MK_NATIVE_XEX_PATH="$xex_path" MK_NATIVE_NDK_ROOT="$ndk_root"
 python3 - <<'PY'
@@ -58,7 +62,9 @@ for item in source.rglob('*'):
     'ReXGlue Android runtime source: https://github.com/PauloUbirajara/asura-wrath-rexglue-sdk\n'
     'Pinned commit: 38b40e7424e5d3ce1afa38dca10e9a84b1aa2317\n'
     'Submodule sources and commit pins: .gitmodules and gitlinks in that SDK.\n'
-    'Local SDK changes: native/patches/android-fiber.patch, indirect-call-diagnostics.patch, floating-point-stub-logging.patch, file-open-observer.patch, android-idle-waits.patch.\n'
+    'Local SDK changes: native/patches/android-fiber.patch, indirect-call-diagnostics.patch, floating-point-stub-logging.patch, file-open-observer.patch, android-idle-waits.patch, android-custom-driver.patch.\n'
+    'AdrenoTools source: https://github.com/bylaws/libadrenotools at 8fae8ce254dfc1344527e05301e43f37dea2df80 (BSD 2-Clause).\n'
+    'Linker namespace helper: https://github.com/bylaws/liblinkernsbypass at aa3975893d83ef1bc84c321ec60c65fbf1287887 (BSD 2-Clause).\n'
     'File-open observer and SDL/POSIX idle waits adapted from Shiftglue SDK commit 2db68133de6ec609c275fd8707316a240dd980e5 (BSD 3-Clause); source and notices preserved.\n'
     'Original Android wrapper and build scripts: AmzHook/MK-Komplet-Edition-Andrid-Recomp-X360.\n'
     'No XEX, ISO or game assets are distributed; the APK includes title-specific compiled code.\n'
@@ -67,5 +73,8 @@ for item in source.rglob('*'):
     'Replace compatible runtime libraries in out/native/jniLibs/arm64-v8a, then build_apk.sh --native.\n')
 for notice in Path(os.environ['MK_NATIVE_NDK_ROOT']).glob('NOTICE*'):
     if notice.is_file(): shutil.copyfile(notice, notices / ('NDK-' + notice.name))
+adreno = source.parent / 'adrenotools'
+shutil.copyfile(adreno / 'LICENSE', notices / 'ADRENOTOOLS-LICENSE')
+shutil.copyfile(adreno / 'lib/linkernsbypass/LICENSE', notices / 'LINKERNSBYPASS-LICENSE')
 PY
 echo 'Native libraries prepared. Build the experimental APK with bash tools/build_apk.sh --native.'

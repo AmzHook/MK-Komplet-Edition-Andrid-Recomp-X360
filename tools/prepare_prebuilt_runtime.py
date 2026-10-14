@@ -10,7 +10,7 @@ import subprocess
 import tomllib
 
 REPO = Path(__file__).resolve().parent.parent
-LIBRARIES = {'libmk_komplete.so', 'librexruntime.so', 'librexgpu-xenos.so', 'libc++_shared.so'}
+LIBRARIES = {'libmk_komplete.so', 'librexruntime.so', 'librexgpu-xenos.so', 'libc++_shared.so', 'libadrenotools.so', 'libmain_hook.so', 'libhook_impl.so', 'libfile_redirect_hook.so', 'libgsl_alloc_hook.so'}
 SYSTEM_LIBRARIES = {'libc.so', 'libm.so', 'libdl.so', 'liblog.so', 'libandroid.so', 'libOpenSLES.so', 'libvulkan.so', 'libEGL.so', 'libGLESv2.so', 'libz.so'}
 XEX_SHA256 = 'e51751328751287b2a6113c815b99f470d1ea0c88f5d9d9f9b1942a28b3e7f6d'
 
@@ -44,13 +44,13 @@ def verify(source):
     properties = dict(line.split('=', 1) for line in (source / 'runtime.properties').read_text().splitlines() if '=' in line)
     if properties != {'xex_sha256': XEX_SHA256, 'title_id': '575207FD', 'status': 'experimental-unvalidated'}:
         raise ValueError('Incorrect runtime/XEX version metadata.')
-    required = ['notices/LICENSE', 'notices/SOURCES.txt', 'notices/thirdparty/FFmpeg/COPYING.LGPLv2.1', 'notices/thirdparty/libmspack/libmspack/COPYING.LIB', 'runtime-sources.tar.xz']
+    required = ['notices/LICENSE', 'notices/SOURCES.txt', 'notices/ADRENOTOOLS-LICENSE', 'notices/LINKERNSBYPASS-LICENSE', 'notices/thirdparty/FFmpeg/COPYING.LGPLv2.1', 'notices/thirdparty/libmspack/libmspack/COPYING.LIB', 'runtime-sources.tar.xz']
     for name in required:
         if name not in expected:
             raise ValueError('Required source/license distribution file is missing: ' + name)
     directory = source / 'jniLibs/arm64-v8a'
     if {item.name for item in directory.iterdir()} != LIBRARIES:
-        raise ValueError('Exactly four native libraries are required.')
+        raise ValueError('Exactly nine native libraries are required.')
     for name in sorted(LIBRARIES):
         path = directory / name
         with path.open('rb') as stream:
@@ -83,6 +83,10 @@ def verify(source):
             raise ValueError('Runtime lacks the 0.1.10 file-open observer API.')
         if name == 'librexruntime.so' and b'SDL Android poll sentinel disabled for blocking waits' not in path.read_bytes():
             raise ValueError('Runtime lacks the 0.1.10 Android SDL idle-wait correction.')
+        if name == 'librexruntime.so' and b'Vulkan loader prepared through AdrenoTools' not in path.read_bytes():
+            raise ValueError('Runtime lacks real AdrenoTools custom-driver loading.')
+        if name == 'libadrenotools.so' and 'adrenotools_open_libvulkan' not in details:
+            raise ValueError('AdrenoTools library lacks its Vulkan loader API.')
         if name == 'libmk_komplete.so' and b'MK file request: kind=' not in path.read_bytes():
             raise ValueError('Game wrapper lacks bounded startup/movie file diagnostics.')
         print(f'Verified {name}: ARM64, 16 KiB LOAD alignment, packaged dependencies')

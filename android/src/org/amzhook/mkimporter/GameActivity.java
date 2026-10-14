@@ -5,6 +5,8 @@ import android.widget.Toast;
 
 import java.io.File;
 import java.io.IOException;
+import java.util.ArrayList;
+import java.util.Arrays;
 
 import org.libsdl.app.SDLActivity;
 
@@ -65,13 +67,42 @@ public final class GameActivity extends SDLActivity {
 
         // Each value is a single argument, preserving spaces in imported paths.
         // No user-supplied flags or arbitrary shared-library paths are accepted.
-        return new String[] {
+        int resolution = getIntent().getIntExtra("resolution", 1) == 2 ? 2 : 1;
+        ArrayList<String> arguments = new ArrayList<>(Arrays.asList(
             "--game_data_root=" + gameRoot.getPath(),
             "--user_data_root=" + userRoot.getPath(),
             "--cache_root=" + cacheRoot.getPath(),
             "--log_file=" + new File(logs, "mk_komplete.log").getPath(),
-            "--input_backend=sdl"
-        };
+            "--input_backend=sdl",
+            "--present_letterbox=" + !getIntent().getBooleanExtra("fill_screen", false),
+            "--resolution_scale=" + resolution,
+            // Explicit per-axis values also override older runtime TOML settings.
+            "--draw_resolution_scale_x=" + resolution,
+            "--draw_resolution_scale_y=" + resolution,
+            "--vulkan_allow_present_mode_immediate=" + !getIntent().getBooleanExtra("vsync", true),
+            "--vulkan_allow_present_mode_mailbox=" + !getIntent().getBooleanExtra("vsync", true),
+            "--vulkan_allow_present_mode_fifo_relaxed=" + !getIntent().getBooleanExtra("vsync", true),
+            "--mk_trace_assets=" + getIntent().getBooleanExtra("trace_assets", true)
+        ));
+        // Override any old runtime TOML driver choice even when System is
+        // selected or a selected package fails revalidation.
+        int driverArgument = arguments.size();
+        arguments.add("--adreno_driver_path=");
+        String driverId = getIntent().getStringExtra("driver_id");
+        if (driverId != null && !driverId.isEmpty()) {
+            try {
+                DriverManager.Driver driver = DriverManager.findInstalled(new File(getFilesDir(), "graphics-drivers"), driverId);
+                if (driver == null || driver.minApi > android.os.Build.VERSION.SDK_INT) throw new IOException("driver indisponível ou incompatível com esta versão do Android");
+                File temporary = privatePath(new File(getCacheDir(), "adreno-loader")); ensureDirectory(temporary);
+                arguments.set(driverArgument, "--adreno_driver_path=" + privatePath(driver.directory).getPath() + "/");
+                arguments.add("--adreno_driver_name=" + driver.libraryName);
+                arguments.add("--adreno_hook_path=" + getApplicationInfo().nativeLibraryDir);
+                arguments.add("--adreno_tmp_path=" + temporary.getPath());
+            } catch (IOException | IllegalArgumentException error) {
+                Toast.makeText(this, "Driver padrão: " + error.getMessage(), Toast.LENGTH_LONG).show();
+            }
+        }
+        return arguments.toArray(new String[0]);
     }
 
     private File extraPath(String name, File fallback) {

@@ -20,14 +20,14 @@ min_api=26
 apk_name=MK-Importador-0.1.0.apk
 version_code=1
 version_name=0.1.0
-java_sources=(android/src/org/amzhook/mkimporter/MainActivity.java android/src/org/amzhook/mkimporter/ZipImporter.java android/src/org/amzhook/mkimporter/IsoImporter.java android/src/org/amzhook/mkimporter/GameImporter.java)
+java_sources=(android/src/org/amzhook/mkimporter/MainActivity.java android/src/org/amzhook/mkimporter/LauncherUi.java android/src/org/amzhook/mkimporter/RuntimeSettings.java android/src/org/amzhook/mkimporter/DriverManager.java android/src/org/amzhook/mkimporter/ZipImporter.java android/src/org/amzhook/mkimporter/IsoImporter.java android/src/org/amzhook/mkimporter/GameImporter.java)
 if [ "$variant" = --native ]; then
     build_dir=out/experimental
     manifest=android/AndroidManifest-native.xml
     min_api=28
-    apk_name=MK-Experimental-0.1.10.apk
-    version_code=11
-    version_name=0.1.10
+    apk_name=MK-Experimental-0.1.11.apk
+    version_code=12
+    version_name=0.1.11
     sdk_root="${MK_NATIVE_TOOLS:-/workspace/.tools/mk-native}/rexglue-sdk"
     sdl_java_root="${MK_SDL_JAVA_ROOT:-$repo_root/vendor/sdl3/android/org/libsdl/app}"
     if [ ! -d "$sdl_java_root" ]; then
@@ -35,7 +35,7 @@ if [ "$variant" = --native ]; then
     fi
     test -f "$sdl_java_root/SDLActivity.java" || { echo 'Matching SDL Java sources are missing.' >&2; exit 1; }
     test -f out/native/runtime.properties || { echo 'Native runtime metadata is missing; build native libraries first.' >&2; exit 1; }
-    for library in libmk_komplete.so librexruntime.so librexgpu-xenos.so libc++_shared.so; do
+    for library in libmk_komplete.so librexruntime.so librexgpu-xenos.so libc++_shared.so libadrenotools.so libmain_hook.so libhook_impl.so libfile_redirect_hook.so libgsl_alloc_hook.so; do
         test -f "out/native/jniLibs/arm64-v8a/$library" || { echo "Native library is missing: $library" >&2; exit 1; }
     done
     java_sources+=(android/src/org/amzhook/mkimporter/GameActivity.java)

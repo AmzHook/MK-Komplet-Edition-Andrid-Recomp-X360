@@ -1,0 +1,233 @@
+diff --git a/include/rex/platform/dynlib.h b/include/rex/platform/dynlib.h
+index e3fc40d..2703bbe 100644
+--- a/include/rex/platform/dynlib.h
++++ b/include/rex/platform/dynlib.h
+@@ -32,6 +32,10 @@ class DynamicLibrary {
+ 
+   bool Load(const std::filesystem::path& path, SymbolResolution mode = SymbolResolution::kLazy);
+   void Close();
++#if REX_PLATFORM_ANDROID
++  // Take ownership of a loader handle returned by AdrenoTools.
++  void Adopt(void* handle);
++#endif
+   explicit operator bool() const { return handle_ != nullptr; }
+ 
+   void* GetRawSymbol(const char* name) const;
+diff --git a/src/core/dynlib_posix.cpp b/src/core/dynlib_posix.cpp
+index fcfd6c9..7982d37 100644
+--- a/src/core/dynlib_posix.cpp
++++ b/src/core/dynlib_posix.cpp
+@@ -31,6 +31,13 @@ bool DynamicLibrary::Load(const std::filesystem::path& path, SymbolResolution mo
+   return handle_ != nullptr;
+ }
+ 
++#if REX_PLATFORM_ANDROID
++void DynamicLibrary::Adopt(void* handle) {
++  Close();
++  handle_ = handle;
++}
++#endif
++
+ void DynamicLibrary::Close() {
+   if (handle_) {
+     dlclose(handle_);
+diff --git a/src/ui/vulkan/vulkan_instance.cpp b/src/ui/vulkan/vulkan_instance.cpp
+index 7079af0..7419604 100644
+--- a/src/ui/vulkan/vulkan_instance.cpp
++++ b/src/ui/vulkan/vulkan_instance.cpp
+@@ -20,6 +20,10 @@
+ #include <rex/platform.h>
+ #include <rex/ui/vulkan/instance.h>
+ #include <rex/ui/vulkan/presenter.h>
++#if REX_PLATFORM_ANDROID
++#include <dlfcn.h>
++#include <fstream>
++#endif
+ 
+ #if REX_PLATFORM_MAC
+ #include "vulkan_moltenvk.h"
+@@ -31,6 +35,39 @@ REXCVAR_DEFINE_STRING(adreno_driver_path, "", "UI/Vulkan",
+ REXCVAR_DEFINE_STRING(adreno_driver_name, "libvulkan_freedreno.so", "UI/Vulkan",
+                       "Name of custom Vulkan driver library file (Adreno Tools)");
+ 
++REXCVAR_DEFINE_STRING(adreno_hook_path, "", "UI/Vulkan", "Private APK directory containing AdrenoTools hook libraries");
++REXCVAR_DEFINE_STRING(adreno_tmp_path, "", "UI/Vulkan", "Writable cache directory for the Android 9 AdrenoTools loader");
++
++#if REX_PLATFORM_ANDROID
++namespace {
++// Use the documented AdrenoTools API, rather than loading a driver HAL as a
++// Vulkan loader. The hook code must remain loaded for the loader's lifetime.
++bool LoadAdrenoLoader(rex::platform::DynamicLibrary& loader, std::string directory, const std::string& name) {
++  const std::string hooks = REXCVAR_GET(adreno_hook_path);
++  const std::string temporary = REXCVAR_GET(adreno_tmp_path);
++  if (hooks.empty() || temporary.empty() || directory.empty() || name.empty()) return false;
++  if (directory.back() != '/') directory += '/';
++  const std::filesystem::path requested = std::filesystem::path(directory) / name;
++  std::error_code file_error;
++  if (!std::filesystem::is_regular_file(requested, file_error)) return false;
++  void* tools = dlopen((std::filesystem::path(hooks) / "libadrenotools.so").c_str(), RTLD_NOW | RTLD_LOCAL);
++  if (!tools) { REXLOG_WARN("MK graphics driver: AdrenoTools unavailable: {}", dlerror()); return false; }
++  using OpenLoader = void* (*)(int, int, const char*, const char*, const char*, const char*, const char*, void**);
++  auto open = reinterpret_cast<OpenLoader>(dlsym(tools, "adrenotools_open_libvulkan"));
++  if (!open) { dlclose(tools); return false; }
++  REXLOG_INFO("MK graphics driver: requested custom library={}", requested.string());
++  void* handle = open(RTLD_NOW, 1, temporary.c_str(), hooks.c_str(), directory.c_str(), name.c_str(), nullptr, nullptr);
++  if (!handle) { REXLOG_WARN("MK graphics driver: AdrenoTools loader failed; using system driver"); return false; }
++  if (!dlsym(handle, "vkGetInstanceProcAddr") || !dlsym(handle, "vkDestroyInstance")) { dlclose(handle); return false; }
++  loader.Adopt(handle);
++  // A prepared loader can internally use the system driver. Actual Vulkan
++  // device/driver properties are logged separately after initialization.
++  REXLOG_INFO("MK graphics driver: Vulkan loader prepared through AdrenoTools; request is not proof of active driver");
++  return true;
++}
++}
++#endif
++
+ namespace rex {
+ namespace ui {
+ namespace vulkan {
+@@ -38,6 +75,20 @@ namespace vulkan {
+ std::unique_ptr<VulkanInstance> VulkanInstance::Create(const bool with_surface,
+                                                        const bool try_enable_validation) {
+   std::unique_ptr<VulkanInstance> vulkan_instance(new VulkanInstance());
++  auto retry_system_loader = [&]() -> std::unique_ptr<VulkanInstance> {
++#if REX_PLATFORM_ANDROID
++    if (!REXCVAR_GET(adreno_driver_path).empty()) {
++      REXLOG_WARN("MK graphics driver: incompatible custom initialization; retrying system Vulkan");
++      REXCVAR_SET(adreno_driver_path, std::string());
++      if (vulkan_instance->instance_ && !vulkan_instance->functions_.vkDestroyInstance) {
++        vulkan_instance->functions_.vkDestroyInstance = vulkan_instance->loader_.GetSymbol<PFN_vkDestroyInstance>("vkDestroyInstance");
++      }
++      vulkan_instance.reset();
++      return Create(with_surface, try_enable_validation);
++    }
++#endif
++    return nullptr;
++  };
+ 
+   // Load the RenderDoc API if connected.
+ 
+@@ -76,20 +127,15 @@ std::unique_ptr<VulkanInstance> VulkanInstance::Create(const bool with_surface,
+     for (const std::string& attempted_loader_path : attempted_loader_paths) {
+       REXLOG_ERROR("* tried {}", attempted_loader_path);
+     }
+-    return nullptr;
++    return retry_system_loader();
+   }
+ #else
+ #if REX_PLATFORM_ANDROID
+   std::string custom_driver_dir = REXCVAR_GET(adreno_driver_path);
+   std::string custom_driver_name = REXCVAR_GET(adreno_driver_name);
+   if (!custom_driver_dir.empty()) {
+-    std::filesystem::path custom_path = std::filesystem::path(custom_driver_dir) / custom_driver_name;
+-    if (std::filesystem::exists(custom_path) && vulkan_instance->loader_.Load(custom_path)) {
+-      loader_loaded = true;
+-      REXLOG_INFO("Loaded custom Adreno/Vulkan driver from {}", custom_path.string());
+-    } else {
+-      REXLOG_WARN("Custom GPU driver path '{}' requested but could not be loaded; falling back to system Vulkan loader", custom_path.string());
+-    }
++    loader_loaded = LoadAdrenoLoader(vulkan_instance->loader_, custom_driver_dir, custom_driver_name);
++    if (!loader_loaded) REXLOG_WARN("MK graphics driver: custom loader unavailable; falling back to system Vulkan");
+   }
+ #endif
+   if (!loader_loaded) {
+@@ -97,7 +143,7 @@ std::unique_ptr<VulkanInstance> VulkanInstance::Create(const bool with_surface,
+   }
+   if (!loader_loaded) {
+     REXLOG_ERROR("Failed to load {}", platform::lib_names::kVulkanLoader);
+-    return nullptr;
++    return retry_system_loader();
+   }
+ #endif
+ 
+@@ -108,7 +154,7 @@ std::unique_ptr<VulkanInstance> VulkanInstance::Create(const bool with_surface,
+ #undef XE_VULKAN_LOAD_LOADER_FUNCTION
+   if (!functions_loaded) {
+     REXLOG_ERROR("Failed to get Vulkan loader function pointers");
+-    return nullptr;
++    return retry_system_loader();
+   }
+ 
+   // Load global functions.
+@@ -125,7 +171,7 @@ std::unique_ptr<VulkanInstance> VulkanInstance::Create(const bool with_surface,
+     REXLOG_ERROR(
+         "Failed to get Vulkan global function pointers via "
+         "vkGetInstanceProcAddr");
+-    return nullptr;
++    return retry_system_loader();
+   }
+   // Available since Vulkan 1.1. If this is nullptr, it's a Vulkan 1.0 instance.
+   ifn.vkEnumerateInstanceVersion = PFN_vkEnumerateInstanceVersion(
+@@ -197,7 +243,7 @@ std::unique_ptr<VulkanInstance> VulkanInstance::Create(const bool with_surface,
+     if (get_supported_implementation_extension_count_result != VK_SUCCESS &&
+         get_supported_implementation_extension_count_result != VK_INCOMPLETE) {
+       REXLOG_WARN("Failed to get the Vulkan instance extension count");
+-      return nullptr;
++      return retry_system_loader();
+     }
+     if (supported_implementation_extension_count) {
+       supported_implementation_extensions.resize(supported_implementation_extension_count);
+@@ -210,7 +256,7 @@ std::unique_ptr<VulkanInstance> VulkanInstance::Create(const bool with_surface,
+       }
+       if (get_supported_implementation_extensions_result != VK_SUCCESS) {
+         REXLOG_WARN("Failed to get the Vulkan instance extensions");
+-        return nullptr;
++        return retry_system_loader();
+       }
+     }
+     supported_implementation_extensions.resize(supported_implementation_extension_count);
+@@ -400,7 +446,16 @@ std::unique_ptr<VulkanInstance> VulkanInstance::Create(const bool with_surface,
+   if (instance_create_result != VK_SUCCESS) {
+     REXLOG_ERROR("Failed to create a Vulkan instance: {}",
+                  vk::to_string(vk::Result(instance_create_result)));
+-    return nullptr;
++#if REX_PLATFORM_ANDROID
++    if (!REXCVAR_GET(adreno_driver_path).empty()) {
++      REXLOG_WARN("MK graphics driver: custom Vulkan initialization failed; retrying with system loader");
++      REXCVAR_SET(adreno_driver_path, std::string());
++      vulkan_instance->instance_ = VK_NULL_HANDLE;
++      vulkan_instance.reset();
++      return Create(with_surface, try_enable_validation);
++    }
++#endif
++    return retry_system_loader();
+   }
+ 
+   // Load instance functions.
+@@ -469,7 +524,7 @@ std::unique_ptr<VulkanInstance> VulkanInstance::Create(const bool with_surface,
+ 
+   if (!functions_loaded) {
+     REXLOG_ERROR("Failed to get all Vulkan instance function pointers");
+-    return nullptr;
++    return retry_system_loader();
+   }
+ 
+   // Check whether a surface can be created.
+@@ -477,9 +532,26 @@ std::unique_ptr<VulkanInstance> VulkanInstance::Create(const bool with_surface,
+   if (with_surface &&
+       !VulkanPresenter::GetSurfaceTypesSupportedByInstance(vulkan_instance->extensions_)) {
+     REXLOG_ERROR("The Vulkan instance doesn't support surface types used by Xenia");
+-    return nullptr;
++    return retry_system_loader();
+   }
+ 
++#if REX_PLATFORM_ANDROID
++  if (!REXCVAR_GET(adreno_driver_path).empty()) {
++    uint32_t count = 0;
++    if (ifn.vkEnumeratePhysicalDevices(vulkan_instance->instance_, &count, nullptr) != VK_SUCCESS || !count) {
++      REXLOG_WARN("MK graphics driver: custom loader exposes no GPU; retrying with system loader");
++      REXCVAR_SET(adreno_driver_path, std::string());
++      vulkan_instance.reset();
++      return Create(with_surface, try_enable_validation);
++    }
++    const std::string requested = (std::filesystem::path(REXCVAR_GET(adreno_driver_path)) / REXCVAR_GET(adreno_driver_name)).string();
++    std::ifstream maps("/proc/self/maps"); std::string line; bool mapped = false;
++    while (std::getline(maps, line)) if (line.find(requested) != std::string::npos) { mapped = true; break; }
++    REXLOG_INFO("MK graphics driver: requested library mapped={}; see Vulkan device driverName/driverInfo for active implementation", mapped);
++  } else {
++    REXLOG_INFO("MK graphics driver: using system Vulkan loader");
++  }
++#endif
+   // Log instance properties.
+ 
+   REXLOG_INFO("Vulkan instance API version {}.{}.{}. Enabled layers and extensions:",
