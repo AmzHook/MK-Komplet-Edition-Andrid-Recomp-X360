@@ -12,7 +12,43 @@ O usuário fornece a ISO ou um ZIP com o XEX e as demais pastas do jogo; o
 aplicativo não baixa esses arquivos. O APK `MK-Importador` continua disponível
 como variante que apenas importa arquivos, sem execução.
 
-## Atualização experimental 0.1.6
+## Atualização experimental 0.1.7
+
+Corrige a entrada virtual omitida `0x83054B60`, encontrada no log real da versão
+0.1.6 com LR `0x8301AEFC`, `R3=0x44C22FD0` e `R4=0x44B64788`. Esse método lê
+o ponteiro armazenado em `this+0x174` e grava o argumento `R4` no campo `+0x90`
+do objeto apontado. O wrapper `0x83072630` transfere a execução pelo slot
+`+0x210` da tabela virtual, preservando o LR do chamador.
+
+A auditoria dos 151 slots da tabela `0x8226F878`, instalada pelo método
+`0x8305B3A0` e reinstalada por `0x8305E198`, comprovou cinco entradas
+reais ausentes. A correção acrescenta seus intervalos para gerar os corpos
+originais e os registros:
+
+| Intervalo, com fim exclusivo | Tamanho | Comportamento original |
+| --- | --- | --- |
+| `0x83054B60`–`0x83054B6C` | 12 bytes | Grava `R4` em `+0x90` do objeto apontado por `this+0x174`. |
+| `0x83053BF8`–`0x83053C1C` | 36 bytes | Copia três valores de ponto flutuante e define uma flag como 1. |
+| `0x83054598`–`0x830545A0` | 8 bytes | Ajusta o receptor em `+0x304` e transfere a execução para `0x83092298`, já registrado. |
+| `0x830545A0`–`0x830545BC` | 28 bytes | Retorna se o receptor for nulo; caso contrário, transfere a execução pelo slot virtual `+0x258`. |
+| `0x8309D5C8`–`0x8309D5D0` | 8 bytes | Retorna o ponteiro armazenado em `this+0x184`. |
+
+Os cinco intervalos elevam o total de funções com limites manuais de 21 para
+26. O `blr` isolado em `0x830545BC`, fora do fluxo da função anterior, não foi
+incluído. O suporte a ZIP e ISO e os diagnósticos do runtime são preservados.
+
+Geração completa com validação concluída em 608,8 segundos: 10 arquivos escritos,
+529 preservados e nenhum removido. Os 26 intervalos estão gerados e registrados;
+os 151 slots auditados possuem destinos registrados. A compilação ARM64 e as
+verificações de assinatura e conteúdo do APK passaram, com 4 bibliotecas e 47
+avisos de licença e fontes correspondentes. Os 29 testes Python passaram.
+
+**A versão 0.1.7 ainda precisa de teste no Poco F7; carregamento completo e
+jogabilidade continuam sem validação.** Registrar o método não comprova a validade do
+ponteiro interno armazenado em `this+0x174`, que precisa ser observado no
+próximo teste.
+
+## Atualização anterior 0.1.6
 
 Adiciona a importação direta de ISO Xbox 360 com uma partição XDVDFS em setores
 de 2048 bytes. O botão **Importar ZIP ou ISO** extrai os arquivos da partição do
@@ -30,9 +66,11 @@ Passaram 97 testes Java de importação e 29 testes Python do projeto. A
 compilação ARM64, a assinatura e a verificação do conteúdo do APK concluíram.
 
 Os testes de importação usam imagens sintéticas. **Nenhuma ISO real do MK foi
-fornecida para validar este recurso; o teste da versão 0.1.6 no Poco F7 e a
-jogabilidade continuam pendentes.** Os formatos aceitos e detalhes de validação
-estão em [Importação de ISO](docs/iso-import.md).
+fornecida para validar este recurso; a importação dessa ISO no Poco F7 e a
+jogabilidade continuam pendentes.** O novo log de inicialização da versão
+0.1.6 registrou a entrada ausente `0x83054B60`, tratada pela correção 0.1.7
+acima. Os formatos aceitos e detalhes de validação estão em
+[Importação de ISO](docs/iso-import.md).
 
 ## Atualização anterior 0.1.5
 
@@ -94,7 +132,7 @@ O teste dessa versão superou a falha anterior e encontrou a entrada ausente
 
 ## Instalação e teste
 
-1. Instale `MK-Experimental-0.1.6.apk` em Android 9 ou mais recente, ARM64 e Vulkan.
+1. Instale `MK-Experimental-0.1.7.apk` em Android 9 ou mais recente, ARM64 e Vulkan.
 2. Toque em **Importar ZIP ou ISO**. Selecione a ISO Xbox 360 da sua cópia do
    jogo ou um ZIP contendo exatamente um `default.xex` e todas as demais pastas
    do jogo. No ZIP, uma pasta externa envolvendo esses arquivos é aceita.
@@ -138,7 +176,7 @@ comprimidas, pacotes GOD e ISOs divididas em partes não são aceitos.
 Abra [Actions](https://github.com/AmzHook/MK-Komplet-Edition-Andrid-Recomp-X360/actions).
 O workflow **Package MK Experimental APK** compila o aplicativo Java, verifica
 as bibliotecas ARM64 previamente compiladas e empacota o APK experimental.
-Baixe o artefato `MK-Experimental-0.1.6` de uma execução concluída com sucesso.
+Baixe o artefato `MK-Experimental-0.1.7` de uma execução concluída com sucesso.
 O workflow **Build MK Importador APK** produz a variante de importação.
 O workflow experimental está habilitado para testes no aparelho. A publicação
 da variante de importação é opcional e exige a variável de repositório
@@ -150,7 +188,7 @@ artefatos incluem APK e checksum, ficam disponíveis por 30 dias e seu download
 pode exigir login no GitHub. Após extrair, confira:
 
 ```bash
-sha256sum -c MK-Experimental-0.1.6.apk.sha256
+sha256sum -c MK-Experimental-0.1.7.apk.sha256
 ```
 
 A assinatura é de desenvolvimento. Cada runner gera uma chave nova; uma build
@@ -172,7 +210,7 @@ python3 tools/prepare_prebuilt_runtime.py
 bash tools/build_apk.sh --native
 ```
 
-Saída: `out/apk/MK-Experimental-0.1.6.apk`. Para compilar apenas o importador,
+Saída: `out/apk/MK-Experimental-0.1.7.apk`. Para compilar apenas o importador,
 execute `bash tools/build_apk.sh`.
 
 ## Recompilação nativa a partir da sua cópia

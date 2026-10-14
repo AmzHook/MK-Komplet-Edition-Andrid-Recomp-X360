@@ -38,3 +38,12 @@
 0x83128D38 = { end = 0x83128D40 }
 0x83128D40 = { end = 0x83128D48 }
 0x83128D48 = { end = 0x83128D50 }
+# Virtual methods in the 151-slot table at 0x8226F878, installed by
+# 0x8305B3A0. The observed +0x210 setter writes R4 via the pointer at this+0x174.
+# The four related omissions are proven leaves; preserve the +0x258 virtual
+# tail call and null guard in 0x830545A0, excluding the orphan blr at its end.
+0x83054B60 = { end = 0x83054B6C }
+0x83053BF8 = { end = 0x83053C1C }
+0x83054598 = { end = 0x830545A0 }
+0x830545A0 = { end = 0x830545BC }
+0x8309D5C8 = { end = 0x8309D5D0 }

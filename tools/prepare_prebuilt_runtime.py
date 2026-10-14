@@ -69,8 +69,9 @@ def verify(source):
             re.search(r'\b' + symbol + r'\b', details) for symbol in [
                 'sub_829AEB48', 'sub_827EF090', 'sub_832BB358', 'sub_832BB360',
                 'sub_832BB848', 'sub_82FE6298', 'sub_82FE62C8', 'sub_83128D38',
-                'sub_83128D40', 'sub_83128D48']):
-            raise ValueError('Native game library lacks the observed 0.1.5 startup-call corrections.')
+                'sub_83128D40', 'sub_83128D48', 'sub_83054B60', 'sub_83053BF8',
+                'sub_83054598', 'sub_830545A0', 'sub_8309D5C8']):
+            raise ValueError('Native game library lacks the observed 0.1.7 startup-call corrections.')
         if name == 'librexruntime.so' and not all(symbol in details for symbol in ['JNI_OnLoad', 'Java_org_libsdl_app_SDLActivity_nativeRunMain']):
             raise ValueError('Runtime lacks SDL Java/JNI entry points.')
         if name == 'librexruntime.so' and b'guestThreadID=0x{:08X}' not in path.read_bytes():
