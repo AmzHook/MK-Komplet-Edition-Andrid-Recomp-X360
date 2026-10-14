@@ -17,7 +17,7 @@ def digest(stream):
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument('apk', type=Path, nargs='?', default=REPO / 'out/apk/MK-Experimental-0.1.7.apk')
+    parser.add_argument('apk', type=Path, nargs='?', default=REPO / 'out/apk/MK-Experimental-0.1.8.apk')
     args = parser.parse_args()
     staged = REPO / 'out/native'
     try:

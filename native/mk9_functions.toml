@@ -47,3 +47,10 @@
 0x83054598 = { end = 0x830545A0 }
 0x830545A0 = { end = 0x830545BC }
 0x8309D5C8 = { end = 0x8309D5D0 }
+# UE3 script VM dispatch adapters for opcode banks 0 and 1. The observed
+# 0x8271CEB8 call preserves LR=0x8271CEBC; adapter 0x8270A5B0 advances the
+# frame's bytecode pointer and tail-dispatches through GNativeFuncs+0x400.
+# Static registration audit at 0x8270A880 proves only these two active
+# handlers were absent (opcodes 0x60/0x61); preserve their real dispatch.
+0x8270A588 = { end = 0x8270A5B0 }
+0x8270A5B0 = { end = 0x8270A5DC }

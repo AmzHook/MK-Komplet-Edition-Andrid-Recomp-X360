@@ -12,7 +12,44 @@ O usuário fornece a ISO ou um ZIP com o XEX e as demais pastas do jogo; o
 aplicativo não baixa esses arquivos. O APK `MK-Importador` continua disponível
 como variante que apenas importa arquivos, sem execução.
 
-## Atualização experimental 0.1.7
+## Atualização experimental 0.1.8
+
+Corrige o adaptador de despacho da VM de scripts `0x8270A5B0`, encontrado no
+log real da versão 0.1.7 com LR `0x8271CEBC`. Ele lê o ponteiro de bytecode
+armazenado em `frame+0x0C`, consome um byte de opcode, avança esse ponteiro e
+transfere a execução para o destino em `GNativeFuncs`, preservando o LR.
+A análise também comprovou a ausência do adaptador do banco anterior:
+
+| Intervalo, com fim exclusivo | Tamanho | Despacho original |
+| --- | --- | --- |
+| `0x8270A588`–`0x8270A5B0` | 40 bytes | Banco 0: destino em `0x83417858 + opcode × 4`. |
+| `0x8270A5B0`–`0x8270A5DC` | 44 bytes | Banco 1: destino em `0x83417858 + 0x400 + opcode × 4`. |
+
+Os dois adaptadores pertencem ao conjunto de 16 ponteiros em
+`0x83391A14`–`0x83391A54`; os outros 14 já estavam registrados. Seus
+inicializadores estáticos instalam os handlers dos opcodes `0x60` e `0x61`
+pelo registrador `0x8270A880`. A auditoria decodificou as 754 chamadas estáticas
+a esse registrador: 261 com índice ativo e 493 com índice `-1`, ignorado pelo
+helper. Somente estes dois handlers estavam sem registro; todos os demais
+destinos dessas chamadas já estavam registrados.
+
+A correção acrescenta os dois intervalos para gerar seus corpos originais e
+registros, elevando o total de limites manuais de 26 para 28. O preenchimento
+zero em `0x8270A5DC` fica fora do corpo. O suporte a ZIP e ISO e os diagnósticos
+do runtime são preservados.
+
+Geração completa com validação concluída em 582,2 segundos: 6 arquivos escritos,
+533 preservados e nenhum removido. Os 28 intervalos estão gerados e registrados,
+com 98.587 registros no total e os 16 adaptadores de banco registrados. Todos os
+98.585 registros anteriores foram preservados. A compilação ARM64, os 29 testes
+Python e as verificações de assinatura e conteúdo do APK passaram. O pacote
+contém 4 bibliotecas ARM64 e 47 avisos de licença e fontes correspondentes.
+
+**A versão 0.1.8 ainda precisa de teste no Poco F7; carregamento completo e
+jogabilidade continuam sem validação.** O próximo opcode e o destino escolhido pelo
+adaptador não aparecem neste fatal e ainda precisam de teste no aparelho.
+
+## Atualização anterior 0.1.7
 
 Corrige a entrada virtual omitida `0x83054B60`, encontrada no log real da versão
 0.1.6 com LR `0x8301AEFC`, `R3=0x44C22FD0` e `R4=0x44B64788`. Esse método lê
@@ -43,10 +80,9 @@ os 151 slots auditados possuem destinos registrados. A compilação ARM64 e as
 verificações de assinatura e conteúdo do APK passaram, com 4 bibliotecas e 47
 avisos de licença e fontes correspondentes. Os 29 testes Python passaram.
 
-**A versão 0.1.7 ainda precisa de teste no Poco F7; carregamento completo e
-jogabilidade continuam sem validação.** Registrar o método não comprova a validade do
-ponteiro interno armazenado em `this+0x174`, que precisa ser observado no
-próximo teste.
+O novo log real da versão 0.1.7 registrou a entrada ausente `0x8270A5B0`,
+tratada pela correção 0.1.8 acima. **Carregamento completo e jogabilidade
+continuam sem validação.**
 
 ## Atualização anterior 0.1.6
 
@@ -132,7 +168,7 @@ O teste dessa versão superou a falha anterior e encontrou a entrada ausente
 
 ## Instalação e teste
 
-1. Instale `MK-Experimental-0.1.7.apk` em Android 9 ou mais recente, ARM64 e Vulkan.
+1. Instale `MK-Experimental-0.1.8.apk` em Android 9 ou mais recente, ARM64 e Vulkan.
 2. Toque em **Importar ZIP ou ISO**. Selecione a ISO Xbox 360 da sua cópia do
    jogo ou um ZIP contendo exatamente um `default.xex` e todas as demais pastas
    do jogo. No ZIP, uma pasta externa envolvendo esses arquivos é aceita.
@@ -176,7 +212,7 @@ comprimidas, pacotes GOD e ISOs divididas em partes não são aceitos.
 Abra [Actions](https://github.com/AmzHook/MK-Komplet-Edition-Andrid-Recomp-X360/actions).
 O workflow **Package MK Experimental APK** compila o aplicativo Java, verifica
 as bibliotecas ARM64 previamente compiladas e empacota o APK experimental.
-Baixe o artefato `MK-Experimental-0.1.7` de uma execução concluída com sucesso.
+Baixe o artefato `MK-Experimental-0.1.8` de uma execução concluída com sucesso.
 O workflow **Build MK Importador APK** produz a variante de importação.
 O workflow experimental está habilitado para testes no aparelho. A publicação
 da variante de importação é opcional e exige a variável de repositório
@@ -188,7 +224,7 @@ artefatos incluem APK e checksum, ficam disponíveis por 30 dias e seu download
 pode exigir login no GitHub. Após extrair, confira:
 
 ```bash
-sha256sum -c MK-Experimental-0.1.7.apk.sha256
+sha256sum -c MK-Experimental-0.1.8.apk.sha256
 ```
 
 A assinatura é de desenvolvimento. Cada runner gera uma chave nova; uma build
@@ -210,7 +246,7 @@ python3 tools/prepare_prebuilt_runtime.py
 bash tools/build_apk.sh --native
 ```
 
-Saída: `out/apk/MK-Experimental-0.1.7.apk`. Para compilar apenas o importador,
+Saída: `out/apk/MK-Experimental-0.1.8.apk`. Para compilar apenas o importador,
 execute `bash tools/build_apk.sh`.
 
 ## Recompilação nativa a partir da sua cópia
